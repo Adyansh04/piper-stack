@@ -1,0 +1,9 @@
+ros_ws/build/
+ros_ws/install/
+ros_ws/log/
+data/
+.env
+compile_commands.json
+.cache/
+__pycache__/
+*.pyc
