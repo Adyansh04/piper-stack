@@ -1,0 +1,108 @@
+---
+# clang-tidy for the C++23 ROS 2 packages. Checked with clang-tidy 18.1.3 (Ubuntu 24.04, Jazzy)
+# and 21.1.8 (Ubuntu 26.04, Lyrical); a check the installed version lacks is ignored.
+#
+# Run it on one package from its compile_commands.json (colcon build ... --cmake-args
+# -DCMAKE_EXPORT_COMPILE_COMMANDS=ON):
+#   run-clang-tidy -p build/<pkg> -j 4 -quiet '<absolute path of the package>/(src|test)/.*\.cpp'
+# Read the findings and fix them by hand, never --fix (cpp.md). A NOLINT names the check and says
+# why on the same line.
+#
+# Families on: bugprone, clang-analyzer, concurrency, cppcoreguidelines, misc, modernize,
+# performance, portability, readability. The leading "-*" keeps every other family off (llvm,
+# fuchsia, google, altera, android, abseil, hicpp, cert, boost, ...), and the compiler warnings
+# (clang-diagnostic-*) too: the GCC build raises those.
+#
+# Switched off inside the families (YAML cannot hold a comment inside the Checks list):
+#   modernize-use-trailing-return-type: the code puts return types first.
+#   readability-magic-numbers, cppcoreguidelines-avoid-magic-numbers: numeric kernels are full of
+#     coefficients, matrix indices and unit factors that a named constant would not clarify.
+#   cppcoreguidelines-pro-bounds-pointer-arithmetic: hot loops index restrict-qualified raw
+#     pointers over structure-of-arrays buffers on purpose (cpp-performance.md).
+#   cppcoreguidelines-pro-bounds-constant-array-index: wants gsl::at for every std::array indexed
+#     by a loop variable, and the workspace has no GSL.
+#   readability-identifier-length: x, y, z, i, n, r and t are the right names in geometry code.
+#   readability-math-missing-parentheses: wants (a * b) + c throughout numeric expressions.
+#   bugprone-easily-swappable-parameters: numeric APIs take runs of floats (x, y, z; qx..qw).
+#   portability-avoid-pragma-once: every header uses #pragma once.
+#   portability-template-virtual-member-function: fires inside rclcpp's LoanedMessage at each
+#     publish() of a unique_ptr, where we cannot fix it.
+Checks: >-
+  -*,
+  bugprone-*,
+  clang-analyzer-*,
+  concurrency-*,
+  cppcoreguidelines-*,
+  misc-*,
+  modernize-*,
+  performance-*,
+  portability-*,
+  readability-*,
+  -modernize-use-trailing-return-type,
+  -readability-magic-numbers,
+  -cppcoreguidelines-avoid-magic-numbers,
+  -cppcoreguidelines-pro-bounds-pointer-arithmetic,
+  -cppcoreguidelines-pro-bounds-constant-array-index,
+  -readability-identifier-length,
+  -readability-math-missing-parentheses,
+  -bugprone-easily-swappable-parameters,
+  -portability-avoid-pragma-once,
+  -portability-template-virtual-member-function
+
+# Zero findings are allowed (cpp.md), so every finding is an error: run-clang-tidy exits 1 and CI
+# can gate on it. To list findings without failing: -warnings-as-errors='-*'.
+WarningsAsErrors: '*'
+
+# Report findings in every header outside /opt/ros and /usr, which are the ROS and system ones.
+# LLVM's regex has no lookahead, so the negation is spelled out character by character.
+HeaderFilterRegex: '^/([^ou]|o[^p]|op[^t]|opt[^/]|opt/[^r]|opt/r[^o]|opt/ro[^s]|opt/ros[^/]|u[^s]|us[^r]|usr[^/])'
+
+# Format suggestions follow the .clang-format next to the source.
+FormatStyle: file
+
+CheckOptions:
+  # ROS headers are used through umbrella includes (rclcpp/rclcpp.hpp) and message headers, so
+  # they are exempt, and so are Eigen's and OpenCV's (Eigen/Geometry, opencv2/core.hpp), whose
+  # symbols live in internal headers. The std and project headers are checked.
+  misc-include-cleaner.IgnoreHeaders: '/opt/ros/.*;.*/(msg|srv|action)/.*;.*/eigen3/Eigen/.*;.*/opencv4/opencv2/.*'
+  # RCLCPP_* logging macros expand to branches and would inflate the score.
+  readability-function-cognitive-complexity.IgnoreMacros: true
+  # A struct whose members are all public is plain data (public members have no suffix).
+  misc-non-private-member-variables-in-classes.IgnoreClassesWithAllMemberVariablesBeingPublic: true
+  # A plugin base class with only "virtual ~Base() = default;" and a non-copyable class are fine.
+  cppcoreguidelines-special-member-functions.AllowSoleDefaultDtor: true
+  cppcoreguidelines-special-member-functions.AllowMissingMoveFunctionsWhenCopyIsDeleted: true
+
+  # Names follow cpp.md: CamelCase types, camelBack functions and methods, lower_case variables
+  # and parameters, a trailing "_" on private and protected members, kCamelCase constants and
+  # enumerators, lower_case namespaces, UPPER_CASE macros.
+  readability-identifier-naming.NamespaceCase: lower_case
+  readability-identifier-naming.ClassCase: CamelCase
+  readability-identifier-naming.StructCase: CamelCase
+  readability-identifier-naming.UnionCase: CamelCase
+  readability-identifier-naming.EnumCase: CamelCase
+  readability-identifier-naming.TypeAliasCase: CamelCase
+  readability-identifier-naming.TypedefCase: CamelCase
+  readability-identifier-naming.TemplateParameterCase: CamelCase
+  readability-identifier-naming.FunctionCase: camelBack
+  readability-identifier-naming.MethodCase: camelBack
+  readability-identifier-naming.VariableCase: lower_case
+  readability-identifier-naming.ParameterCase: lower_case
+  readability-identifier-naming.PrivateMemberCase: lower_case
+  readability-identifier-naming.PrivateMemberSuffix: _
+  readability-identifier-naming.ProtectedMemberCase: lower_case
+  readability-identifier-naming.ProtectedMemberSuffix: _
+  readability-identifier-naming.PublicMemberCase: lower_case
+  # constexpr variables and const globals, statics and class constants; a plain const local
+  # stays lower_case.
+  readability-identifier-naming.ConstexprVariableCase: CamelCase
+  readability-identifier-naming.ConstexprVariablePrefix: k
+  readability-identifier-naming.GlobalConstantCase: CamelCase
+  readability-identifier-naming.GlobalConstantPrefix: k
+  readability-identifier-naming.StaticConstantCase: CamelCase
+  readability-identifier-naming.StaticConstantPrefix: k
+  readability-identifier-naming.ClassConstantCase: CamelCase
+  readability-identifier-naming.ClassConstantPrefix: k
+  readability-identifier-naming.EnumConstantCase: CamelCase
+  readability-identifier-naming.EnumConstantPrefix: k
+  readability-identifier-naming.MacroDefinitionCase: UPPER_CASE

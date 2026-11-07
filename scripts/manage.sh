@@ -36,7 +36,18 @@ Usage: $0 <command> [args]
   exec [cmd...]     A shell in ros_ws with the workspace sourced, or run cmd there.
   build [pkg...]    colcon build the named packages and their dependencies, or everything.
   test [pkg...]     Our packages' tests (or the named packages').
+  format            clang-format our C++ in place (.clang-format at the repository root).
 EOF
+}
+
+# Our C++: the piper_* packages, never the vendored ones.
+format_sources() {
+    in_container bash -c '
+        shopt -s globstar nullglob
+        files=(/piper-stack/ros_ws/src/piper_*/**/*.{hpp,cpp})
+        clang-format --style=file -i "${files[@]}"
+        echo "formatted ${#files[@]} files"
+    '
 }
 
 in_container() {
@@ -90,6 +101,7 @@ case "${1:-help}" in
         shift
         run_tests "$@"
         ;;
+    format) format_sources ;;
     help | -h | --help) usage ;;
     *)
         usage >&2
