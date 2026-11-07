@@ -1,0 +1,7 @@
+<library path="piper_hardware">
+  <class name="piper_hardware/PiperSystem"
+         type="piper_hardware::PiperSystem"
+         base_class_type="hardware_interface::SystemInterface">
+    <description>The AgileX Piper over CAN: six joints and the gripper.</description>
+  </class>
+</library>
