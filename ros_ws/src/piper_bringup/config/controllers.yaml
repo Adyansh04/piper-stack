@@ -1,0 +1,37 @@
+controller_manager:
+  ros__parameters:
+    # The arm sends joint feedback at 200 Hz (measured 7 Nov 2026).
+    update_rate: 200
+    joint_state_broadcaster:
+      type: joint_state_broadcaster/JointStateBroadcaster
+    arm_controller:
+      type: joint_trajectory_controller/JointTrajectoryController
+    gripper_controller:
+      type: parallel_gripper_action_controller/GripperActionController
+
+joint_state_broadcaster:
+  ros__parameters:
+    # joint8 follows joint7 through its URDF mimic in robot_state_publisher.
+    joints: [joint1, joint2, joint3, joint4, joint5, joint6, joint7]
+    interfaces: [position, velocity, effort]
+
+arm_controller:
+  ros__parameters:
+    joints: [joint1, joint2, joint3, joint4, joint5, joint6]
+    command_interfaces: [position]
+    state_interfaces: [position, velocity]
+    # The firmware interpolates every target at its own speed scaling, so the arm lags the
+    # trajectory; a goal is judged at its end, with this much time to settle, in s.
+    constraints:
+      goal_time: 5.0
+      stopped_velocity_tolerance: 0.02
+
+gripper_controller:
+  ros__parameters:
+    joint: joint7
+    state_interfaces: [position, velocity]
+    # How close to the target counts as reached, in m of one finger's travel.
+    goal_tolerance: 0.002
+    allow_stalling: true
+    stall_timeout: 1.0
+    stall_velocity_threshold: 0.001
