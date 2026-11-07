@@ -1,0 +1,195 @@
+#include "piper_driver/fake_arm.hpp"
+
+#include <algorithm>
+#include <cmath>
+#include <utility>
+
+namespace piper_driver
+{
+
+namespace
+{
+using protocol::Frame;
+namespace id = protocol::id;
+
+Frame pairFrame(std::uint32_t can_id, double a, double b, double scale)
+{
+    Frame f{.id = can_id, .length = 8, .data = {}};
+    protocol::detail::putI32(f.data, 0, protocol::detail::toI32(a * scale));
+    protocol::detail::putI32(f.data, 4, protocol::detail::toI32(b * scale));
+    return f;
+}
+}  // namespace
+
+std::expected<std::unique_ptr<FakeArm>, std::error_code> FakeArm::start(const Options & options)
+{
+    auto bus = CanBus::open(options.interface);
+    if (!bus)
+    {
+        return std::unexpected(bus.error());
+    }
+    return std::unique_ptr<FakeArm>(new FakeArm(std::move(*bus), options));
+}
+
+FakeArm::FakeArm(CanBus bus, const Options & options)
+    : bus_(std::move(bus))
+    , options_(options)
+    , position_rad_(options.start_rad)
+    , target_rad_(options.start_rad)
+    , runner_([this](const std::stop_token & stop) { run(stop); })
+{}
+
+FakeArm::~FakeArm() = default;
+
+std::array<double, protocol::kJointCount> FakeArm::positions() const
+{
+    const std::scoped_lock lock(mutex_);
+    return position_rad_;
+}
+
+bool FakeArm::enabled() const
+{
+    const std::scoped_lock lock(mutex_);
+    return enabled_;
+}
+
+void FakeArm::run(const std::stop_token & stop)
+{
+    const double dt_s = std::chrono::duration<double>(options_.period).count();
+    auto next = std::chrono::steady_clock::now();
+    for (std::uint64_t cycle = 0; !stop.stop_requested(); ++cycle)
+    {
+        while (auto received = bus_.receive(std::chrono::milliseconds{0}))
+        {
+            if (!received->error)
+            {
+                apply(received->frame);
+            }
+        }
+        step(dt_s);
+        sendFeedback(cycle);
+        next += options_.period;
+        std::this_thread::sleep_until(next);
+    }
+}
+
+void FakeArm::apply(const Frame & f)
+{
+    const std::scoped_lock lock(mutex_);
+    switch (f.id)
+    {
+        case id::kMotorEnable:
+            if (f.data[0] == 0x07 || f.data[0] == 0xFF)
+            {
+                enabled_ = f.data[1] == 0x02;
+                target_rad_ = position_rad_;
+            }
+            return;
+        case id::kMotionCtrl2:
+            ctrl_mode_ = f.data[0];
+            move_mode_ = f.data[1];
+            speed_percent_ = std::min<int>(f.data[2], 100);
+            return;
+        case id::kMotionCtrl1:
+            if (f.data[0] == 0x01)
+            {
+                stopped_ = true;
+                target_rad_ = position_rad_;
+            }
+            else if (f.data[0] == 0x02)
+            {
+                stopped_ = false;
+            }
+            return;
+        case id::kGripperCtrl:
+            gripper_stroke_m_ = protocol::detail::beI32(f.data, 0) * protocol::kMetrePerMicrometre;
+            return;
+        case id::kFirmware:
+            if (f.data[0] == 0x01)
+            {
+                for (const char * chunk : {"S-V1.8-2", "fake-arm"})
+                {
+                    Frame reply{.id = id::kFirmware, .length = 8, .data = {}};
+                    std::copy_n(chunk, 8, reply.data.begin());
+                    (void)bus_.send(reply);
+                }
+            }
+            return;
+        default:
+            if (!stopped_)
+            {
+                protocol::decodeJointTargets(f, target_rad_);
+            }
+    }
+}
+
+void FakeArm::step(double dt_s)
+{
+    const std::scoped_lock lock(mutex_);
+    const bool moving = enabled_ && !stopped_ && ctrl_mode_ == 0x01
+                        && move_mode_ == static_cast<std::uint8_t>(protocol::MoveMode::kJ);
+    if (!moving)
+    {
+        return;
+    }
+    const double max_step = options_.max_speed_rad_s * speed_percent_ / 100.0 * dt_s;
+    for (std::size_t j = 0; j < protocol::kJointCount; ++j)
+    {
+        position_rad_[j] += std::clamp(target_rad_[j] - position_rad_[j], -max_step, max_step);
+    }
+}
+
+void FakeArm::sendFeedback(std::uint64_t cycle)
+{
+    std::array<double, protocol::kJointCount> q{};
+    double stroke_m = 0.0;
+    Frame status{.id = id::kStatus, .length = 8, .data = {}};
+    {
+        const std::scoped_lock lock(mutex_);
+        q = position_rad_;
+        stroke_m = gripper_stroke_m_;
+        const bool arrived = std::ranges::equal(position_rad_, target_rad_);
+        status.data = {
+            ctrl_mode_,
+            static_cast<std::uint8_t>(stopped_ ? 0x01 : 0x00),
+            move_mode_,
+            0,
+            static_cast<std::uint8_t>(arrived ? 0x00 : 0x01),
+            0,
+            0,
+            0};
+    }
+    (void)bus_.send(status);
+    for (std::uint32_t i = 0; i < 3; ++i)
+    {
+        (void)bus_.send(
+            pairFrame(id::kJoint12 + i, q[2 * i], q[2 * i + 1], protocol::kMilliDegPerRad));
+    }
+    Frame gripper{.id = id::kGripper, .length = 8, .data = {}};
+    protocol::detail::putI32(
+        gripper.data, 0, protocol::detail::toI32(stroke_m / protocol::kMetrePerMicrometre));
+    (void)bus_.send(gripper);
+    // Driver frames at a fifth of the rate, like the arm's 40 Hz.
+    if (cycle % 5 == 0)
+    {
+        const bool on = enabled();
+        for (std::uint32_t j = 0; j < protocol::kJointCount; ++j)
+        {
+            Frame driver{
+                .id = id::kLowSpeed1 + j,
+                .length = 8,
+                .data = {
+                    0x00,
+                    0xE6,
+                    0x00,
+                    0x1C,
+                    0x16,
+                    static_cast<std::uint8_t>(on ? protocol::kDriverEnabledBit : 0x00),
+                    0,
+                    0}};
+            (void)bus_.send(driver);
+        }
+    }
+}
+
+}  // namespace piper_driver
