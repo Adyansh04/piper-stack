@@ -1,0 +1,80 @@
+---
+# ROS 2 base (Google derived), with Allman braces and 4-space indentation for readability.
+Language: Cpp
+BasedOnStyle: Google
+Standard: Latest
+
+# ---------------------------------------------------------------- Indentation
+IndentWidth: 4
+TabWidth: 4
+UseTab: Never
+# "public:" sits flush with the class keyword (one indent level left of members).
+AccessModifierOffset: -4
+ContinuationIndentWidth: 4
+ConstructorInitializerIndentWidth: 4
+IndentCaseLabels: true
+NamespaceIndentation: None
+IndentPPDirectives: AfterHash
+
+# --------------------------------------------------------------------- Braces
+# Every brace goes on its own line (Allman), except lambda bodies and "} while".
+BreakBeforeBraces: Custom
+BraceWrapping:
+  AfterCaseLabel: true
+  AfterClass: true
+  AfterControlStatement: Always
+  AfterEnum: true
+  AfterFunction: true
+  AfterNamespace: true
+  AfterStruct: true
+  AfterUnion: true
+  AfterExternBlock: true
+  BeforeCatch: true
+  BeforeElse: true
+  BeforeLambdaBody: false
+  BeforeWhile: false
+  IndentBraces: false
+  SplitEmptyFunction: false
+  SplitEmptyRecord: false
+  SplitEmptyNamespace: false
+
+# Optional: force braces around single-statement if/for/while (clang-format >= 15).
+# InsertBraces: true
+
+# ------------------------------------------------------------ Line shortening
+# One statement per line: no "if (x) return;" or one-line loops.
+AllowShortIfStatementsOnASingleLine: Never
+AllowShortLoopsOnASingleLine: false
+AllowShortBlocksOnASingleLine: Never
+AllowShortCaseLabelsOnASingleLine: false
+AllowShortFunctionsOnASingleLine: Empty
+AllowShortLambdasOnASingleLine: Inline
+
+# --------------------------------------------------------------------- Wrapping
+ColumnLimit: 100
+# A call or declaration that does not fit breaks right after "(", never aligns to it.
+AlignAfterOpenBracket: AlwaysBreak
+# Either everything on one line, or one argument/parameter per line.
+BinPackArguments: false
+BinPackParameters: false
+BreakConstructorInitializers: BeforeComma
+BreakBeforeBinaryOperators: NonAssignment
+AlwaysBreakTemplateDeclarations: Yes
+
+# ------------------------------------------------------------ Vertical spacing
+# Blank line between function/class definitions (needs clang-format >= 14, uncomment if available).
+# SeparateDefinitionBlocks: Always
+MaxEmptyLinesToKeep: 1
+KeepEmptyLinesAtTheStartOfBlocks: false
+
+# ------------------------------------------------------------------------ Misc
+# "const T & ref" and "T * ptr".
+PointerAlignment: Middle
+DerivePointerAlignment: false
+# Doxygen blocks and // comments keep their line breaks.
+ReflowComments: false
+AlignTrailingComments: true
+FixNamespaceComments: true
+SpaceAfterTemplateKeyword: true
+SortIncludes: true
+IncludeBlocks: Preserve
