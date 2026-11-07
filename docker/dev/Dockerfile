@@ -23,6 +23,19 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         ros-lyrical-ament-lint-auto \
     && rm -rf /var/lib/apt/lists/*
 
+# The wrist camera: Percipio's camport_ros2 driver (ros_ws/src/vendor) and an image viewer.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        ros-lyrical-camera-info-manager \
+        ros-lyrical-cv-bridge \
+        ros-lyrical-diagnostic-updater \
+        ros-lyrical-example-interfaces \
+        ros-lyrical-image-publisher \
+        ros-lyrical-image-transport \
+        ros-lyrical-rqt-image-view \
+        ros-lyrical-tf2-eigen \
+        ros-lyrical-tf2-sensor-msgs \
+    && rm -rf /var/lib/apt/lists/*
+
 # The container runs as the host user so that files it writes in the checkout stay the user's: the
 # base image's own user `ubuntu` takes the host's IDs.
 ARG HOST_UID=1000
