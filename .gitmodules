@@ -1,0 +1,3 @@
+[submodule "ros_ws/src/vendor/camport_ros2"]
+	path = ros_ws/src/vendor/camport_ros2
+	url = https://github.com/percipioxyz/camport_ros2.git
