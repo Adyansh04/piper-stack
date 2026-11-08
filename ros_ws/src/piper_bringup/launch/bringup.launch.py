@@ -50,7 +50,7 @@ def generate_launch_description():
             'hardware', default_value='mock', choices=['mock', 'can'],
             description='mock: ros2_control mock, no arm. can: the real arm over CAN.'),
         DeclareLaunchArgument(
-            'can_interface', default_value='can0',
+            'can_interface', default_value='can_follower',
             description='CAN interface of the arm, up at 1 Mbit/s (hardware:=can).'),
         DeclareLaunchArgument(
             'enable', default_value='false', choices=['true', 'false'],

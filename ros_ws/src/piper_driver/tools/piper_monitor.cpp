@@ -1,6 +1,6 @@
 // Prints the arm's decoded feedback ten times a second. Read-only: it never sends a frame.
 //
-//   piper_monitor [interface=can0] [seconds=0: until Ctrl-C]
+//   piper_monitor [interface=can_follower] [seconds=0: until Ctrl-C]
 
 #include <atomic>
 #include <chrono>
@@ -19,7 +19,7 @@ std::atomic<bool> g_stop{false};
 
 int main(int argc, char ** argv)
 {
-    const std::string interface = argc > 1 ? argv[1] : "can0";
+    const std::string interface = argc > 1 ? argv[1] : "can_follower";
     const double seconds = argc > 2 ? std::stod(argv[2]) : 0.0;
     std::signal(SIGINT, [](int) { g_stop = true; });
     std::signal(SIGTERM, [](int) { g_stop = true; });

@@ -5,7 +5,7 @@
 <robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="piper">
   <xacro:arg name="prefix" default=""/>
   <xacro:arg name="hardware" default="mock"/>
-  <xacro:arg name="can_interface" default="can0"/>
+  <xacro:arg name="can_interface" default="can_follower"/>
   <xacro:arg name="enable_on_activate" default="false"/>
   <xacro:arg name="speed_percent" default="10"/>
 

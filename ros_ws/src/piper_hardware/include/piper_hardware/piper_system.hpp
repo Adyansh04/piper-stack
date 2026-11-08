@@ -70,7 +70,7 @@ private:
     std::array<Joint, kArmJoints + 1> joints_{};
     std::unique_ptr<piper_driver::Arm> arm_;
 
-    std::string can_interface_ = "can0";
+    std::string can_interface_ = "can_follower";
     bool enable_on_activate_ = false;
     int speed_percent_ = 10;
     std::int64_t feedback_timeout_ns_ = 50'000'000;
