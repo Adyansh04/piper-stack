@@ -24,6 +24,7 @@ From the motors up:
 | Skills | `piper_skills` | Named poses, views, find, pick, place, place target: one action or service each |
 | Missions | `piper_bt` | Behaviour trees over the skills, run through `run_tree`; Groot2 edits and watches them |
 | Teleop and estimates | `piper_teleop`, `piper_estimation` | Keyboard jogging through Servo; the wrench at the tool and grasp detection from joint torques |
+| Data and policies | `piper_lerobot` | LeRobot's robot and teleoperator over a ZMQ bridge node: recording datasets, policies' joint targets through Servo |
 | Interfaces | `piper_msgs` | The stack's messages, services and actions |
 
 Each layer only calls the one below through ROS interfaces: the skills call MoveIt and the

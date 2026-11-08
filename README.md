@@ -50,6 +50,13 @@ streams Isaac Sim's UI over WebRTC instead of rendering to a window: connect NVI
 WebRTC Streaming Client to that machine (49100/tcp and 47998/udp). The stream has no
 authentication, so keep it on a trusted network. On the real arm everything runs on the local PC.
 
+### Datasets with LeRobot
+
+[`piper_lerobot`](ros_ws/src/piper_lerobot/README.md) connects LeRobot to the stack: an operator
+drives the arm with the keyboard jog while `lerobot-record` records the joint positions, the
+commanded positions and the wrist image into a local LeRobot dataset; a LeRobot policy's joint
+targets go through MoveIt Servo, which checks them for collisions and joint limits.
+
 ### Training a policy
 
 [`lab/`](lab/README.md) trains a reach policy in Isaac Lab on the simulator's own arm and exports
@@ -90,3 +97,5 @@ Each package's README (under `ros_ws/src/`) lists its nodes, topics, parameters 
 - [SAM 3.1](https://github.com/facebookresearch/sam3) by Meta (SAM License) and
   [GraspGenX](https://github.com/NVlabs/GraspGenX) by NVIDIA (Apache 2.0): segmentation and grasp
   generation in `piper_perception`.
+- [LeRobot](https://github.com/huggingface/lerobot) by Hugging Face (Apache 2.0): datasets and
+  policies, through `piper_lerobot`.

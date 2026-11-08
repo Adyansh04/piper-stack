@@ -1,0 +1,25 @@
+lerobot_bridge:
+  ros__parameters:
+    # Where LeRobot's plugins reach the bridge (ZMQ request-reply); the loopback only.
+    endpoint: "tcp://127.0.0.1:5590"
+    arm_joints: [joint1, joint2, joint3, joint4, joint5, joint6]
+    # One finger's travel, in m: the gripper's position in every frame.
+    gripper_joint: "joint7"
+    joint_state_topic: "/joint_states"
+    # The trajectory controller's reference: what the arm is commanded to, for the teleoperator.
+    controller_state_topic: "/arm_controller/controller_state"
+    image_topic: "/wrist_camera/color/image_raw"
+    # MoveIt Servo's joint jog input and command-type switch (piper_moveit_config's servo.yaml).
+    jog_topic: "/servo_node/delta_joint_cmds"
+    command_type_service: "/servo_node/switch_command_type"
+    gripper_action: "/gripper_controller/gripper_cmd"
+    # Joint jogs a second; Servo publishes at 100 Hz.
+    jog_rate_hz: 100.0
+    # A joint's jog velocity is the gain (1/s) times its distance to the target, capped (rad/s).
+    jog_gain: 2.0
+    max_jog_velocity: 0.5
+    # The arm stops when no action has come for this long, in s (Servo then ramps it down).
+    target_timeout_s: 0.5
+    # Gripper targets closer than this to the last goal send none, in m; its grip effort, N m.
+    gripper_deadband_m: 0.002
+    gripper_effort_nm: 1.0

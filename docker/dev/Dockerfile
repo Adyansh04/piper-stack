@@ -83,6 +83,14 @@ RUN UV_PROJECT_ENVIRONMENT=/opt/graspgenx-venv uv sync --project /opt/graspgenx 
     && GRASPGENX_CHECKPOINT_DIR=/opt/graspgenx GRASPGENX_GRIPPER_CFG_DIR=/opt/graspgenx \
         /opt/graspgenx-venv/bin/python -c "import graspgenx.x_grippers, torch, zmq, yaml"
 
+# LeRobot's Python 3.12 environment, from its locked project (lerobot/), for recording datasets and
+# training and running policies: LeRobot pins numpy below 2.3, which has no wheels for Lyrical's
+# Python 3.14, so it reaches the stack through piper_lerobot's ZMQ bridge instead of rclpy.
+COPY lerobot/pyproject.toml lerobot/uv.lock /opt/lerobot/
+RUN UV_PROJECT_ENVIRONMENT=/opt/lerobot-venv uv sync --project /opt/lerobot --locked --no-cache \
+        --python 3.12 \
+    && /opt/lerobot-venv/bin/python -c "import lerobot, torch, zmq, av"
+
 # Linters for the shell scripts and the Python (scripts/manage.sh lint).
 ARG RUFF_VERSION=0.17.4
 RUN apt-get update && apt-get install -y --no-install-recommends shellcheck \
