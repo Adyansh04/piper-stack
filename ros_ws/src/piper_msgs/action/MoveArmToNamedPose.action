@@ -1,0 +1,10 @@
+# Move the arm to a named joint configuration of the SRDF, e.g. "transport".
+
+string name
+
+# Share of the joint velocity limits, 0 to 1; 0 uses the configured scale.
+float64 velocity_scale
+---
+bool success
+string message
+---

@@ -1,0 +1,18 @@
+# Run one behaviour tree to its end.
+
+# Tree id from the executor's loaded files, e.g. "PickAndPlace".
+string tree
+
+# "key=value" entries written to the tree's blackboard before it starts; a tree's required keys must be
+# among them.
+string[] blackboard
+---
+bool success
+string message
+
+# "SUCCESS", "FAILURE" or "HALTED".
+string status
+---
+# Hierarchical paths of the leaves running at the last tick, such as
+# "pick_and_place/pick/place_it" (BehaviorTree.CPP full paths, not leaf names).
+string[] running

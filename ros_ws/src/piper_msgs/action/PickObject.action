@@ -1,0 +1,32 @@
+# Grasp an object from the table: segment it, view it again from close above, generate and rank
+# grasps, move back along the best one's approach axis to its pre-grasp pose (pick.pregrasp_distance_m),
+# move in along it, close, check the fingers, lift (a side grasp lifts a little and backs out along
+# its approach first).
+
+# What to pick, e.g. "t connector"; the object is segmented again from the current view.
+string prompt
+
+
+# Instances scoring below this are left out; 0 uses the configured threshold (find.min_score).
+float32 min_score
+
+# Which grasps: "top" (approaches within grasp.top_max_angle_deg of straight down), "side" (flatter
+# ones: from the side or diagonally from above), or "auto" (empty: the same): top grasps first, the
+# side grasps when no top grasp is reachable (e.g. under a shelf).
+string approach
+---
+bool success
+string message
+
+# The grasp that was executed, in the robot's base frame; valid only when success is true.
+piper_msgs/Grasp grasp
+
+# Finger opening after closing, in metres; valid only when success is true.
+float64 finger_width_m
+
+# On a failure: the arm is still down at the table or the object; back off before anything else.
+bool arm_stuck
+---
+# "segmenting", "looking_closer", "planning_grasps", "moving_above", "descending", "closing", "lifting"
+# ("descending" is the move in along the approach, also for a side grasp)
+string phase

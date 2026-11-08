@@ -1,0 +1,11 @@
+# Move the wrist camera to one of the table's views.
+
+# "full", "left", "middle", "right" or "section_<n>" (see FindObjects.views).
+string view
+---
+bool success
+string message
+
+# Where the camera's optical frame ended up, in the robot's base frame; valid only when success is true.
+geometry_msgs/PoseStamped camera_pose
+---

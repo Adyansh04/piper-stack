@@ -1,0 +1,12 @@
+# What the behaviour tree executor can run: its node types and its trees.
+---
+# BehaviorTree.CPP's TreeNodesModel XML of every registered node type, the built-in ones too,
+# with each port's direction, type, default and description.
+string models_xml
+
+# The node types BehaviorTree.CPP registers itself (Sequence, Inverter, Script, ...).
+string[] builtin_nodes
+
+# The registered trees' IDs, and of those the ones saved by users (editable, deletable).
+string[] trees
+string[] user_trees

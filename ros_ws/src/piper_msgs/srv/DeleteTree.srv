@@ -1,0 +1,7 @@
+# Remove a user's tree file and load every tree again; the shipped trees cannot be removed.
+
+# The file's name in the user tree directory, without ".xml".
+string name
+---
+bool success
+string message

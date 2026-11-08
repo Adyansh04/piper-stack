@@ -1,0 +1,14 @@
+# Parallel-gripper grasps for one object.
+
+# The object's points, in a frame whose z points up: GraspGenX builds its top-down grasps along the
+# frame's -z. Grasps come back in this frame.
+sensor_msgs/PointCloud2 object_cloud
+
+# Grasps to sample; 0 uses the configured number. Refused above the server's max_grasps.
+uint32 num_grasps
+---
+bool success
+string message
+
+# Valid only when success is true. Best first by the generator's own score.
+piper_msgs/Grasp[] grasps

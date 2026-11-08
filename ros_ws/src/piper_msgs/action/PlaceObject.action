@@ -1,0 +1,46 @@
+# Put the held object down on the table: on the free spot nearest the robot (mode free), or with
+# its centre at a target (relative, metric, anchor).
+
+# "free" (also when empty): the free spot nearest the robot in `region`. "relative": x and y from
+# -1 to 1 across the table's workspace, where +-1 is as far as the object still sits fully on it. "metric": x and
+# y in metres from the workspace's centre. "anchor": x and y in metres from the centre of the object
+# `anchor` names, found on the table. x points to the right and y away, as seen from the robot's
+# base (base_link's -y and +x axes).
+string mode
+float64 x
+float64 y
+
+# Free mode: part of the table to use, as seen from the robot: "any" (the "full" view: the band
+# along the near edge, the view planner's max_depth_m deep, across the whole width), "left",
+# "middle" or "right" (sections of that band).
+string region
+
+# A target that is taken: the object goes to the nearest free spot at most this far from it, in
+# metres; 0 uses the server's place.tolerance_m. Refused when none is free.
+float64 tolerance_m
+
+# The object's long axis from the table's x axis, in degrees, when use_yaw is true (a long axis
+# looks the same after half a turn). Otherwise any heading the wrist reaches.
+bool use_yaw
+float64 yaw_deg
+# How far the heading may be off, in degrees; 0 uses the server's place.yaw_tolerance_deg.
+float64 yaw_tolerance_deg
+
+# Anchor mode: what to find on the table, as it looks to SAM 3.1 ("red cube").
+string anchor
+# Anchor mode: where the anchor is (e.g. an earlier place_pose), so the match nearest it is taken;
+# an empty frame_id: the best match.
+geometry_msgs/PoseStamped anchor_pose
+---
+bool success
+string message
+
+# Where the object was set down, in the robot's base frame: its centre on the table, its long axis as the x axis;
+# valid only when success is true.
+geometry_msgs/PoseStamped place_pose
+
+# On a failure: the arm is still down at the table or the object; back off before anything else.
+bool arm_stuck
+---
+# "finding_anchor", "finding_spot", "moving_above", "descending", "releasing", "retreating"
+string phase
