@@ -27,6 +27,7 @@ add_library(piper_bt_leaves SHARED
   src/skills/pick_object.cpp
   src/skills/place_object.cpp
   src/skills/place_target.cpp
+  src/skills/run_stage.cpp
   src/skills/view_workspace.cpp
 )
 target_include_directories(piper_bt_leaves PUBLIC

@@ -34,6 +34,7 @@
 #include "piper_bt/skills/pick_object.hpp"
 #include "piper_bt/skills/place_object.hpp"
 #include "piper_bt/skills/place_target.hpp"
+#include "piper_bt/skills/run_stage.hpp"
 #include "piper_bt/skills/view_workspace.hpp"
 #include "piper_bt/tree_library.hpp"
 
@@ -178,6 +179,7 @@ public:
         registerScripted<piper_bt::PickObject>(factory_, "PickObject", script_, log_);
         registerScripted<piper_bt::PlaceObject>(factory_, "PlaceObject", script_, log_);
         registerScripted<piper_bt::PlaceTarget>(factory_, "PlaceTarget", script_, log_);
+        registerScripted<piper_bt::RunStage>(factory_, "RunStage", script_, log_);
         for (const auto & entry : std::filesystem::recursive_directory_iterator(
                  std::filesystem::path(PIPER_BT_TREES_DIR)))
         {
@@ -511,4 +513,28 @@ TEST_F(TreeLoads, SortObjectsSkipsAnObjectNotNamed)
     };
     EXPECT_EQ(sort(""), (std::vector<std::string>{"left", "right"}));
     EXPECT_EQ(sort("blue cube"), (std::vector<std::string>{"left", "middle", "right"}));
+}
+
+TEST_F(TreeLoads, AssembleStagesRunsTheStagesInOrderUntilOneFails)
+{
+    std::vector<std::string> stages;
+    std::string failing;
+    Missions missions([&](const std::string & name, BT::TreeNode & leaf) {
+        if (name == "run")
+        {
+            stages.push_back(leaf.getInput<std::string>("stage").value());
+            return stages.back() == failing ? kNo : kOk;
+        }
+        return kOk;
+    });
+    const Entries entries{{"stages", "ring;collar;pin;cap"}};
+    EXPECT_EQ(missions.run("AssembleStages", entries), kOk);
+    EXPECT_EQ(stages, (std::vector<std::string>{"ring", "collar", "pin", "cap"}));
+    EXPECT_EQ(missions.count("done"), 1);
+    // A failed stage ends the run back at ready: the later stages never run.
+    stages.clear();
+    failing = "collar";
+    EXPECT_EQ(missions.run("AssembleStages", entries), kNo);
+    EXPECT_EQ(stages, (std::vector<std::string>{"ring", "collar"}));
+    EXPECT_EQ(missions.count("back_to_ready"), 1);
 }

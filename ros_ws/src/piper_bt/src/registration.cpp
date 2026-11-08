@@ -12,6 +12,7 @@
 #include "piper_bt/skills/pick_object.hpp"
 #include "piper_bt/skills/place_object.hpp"
 #include "piper_bt/skills/place_target.hpp"
+#include "piper_bt/skills/run_stage.hpp"
 #include "piper_bt/skills/view_workspace.hpp"
 
 namespace piper_bt
@@ -40,6 +41,7 @@ void registerLeaves(BT::BehaviorTreeFactory & factory, const RosContext & contex
     registerLeaf<PickObject>(factory, "PickObject", context);
     registerLeaf<PlaceObject>(factory, "PlaceObject", context);
     registerLeaf<PlaceTarget>(factory, "PlaceTarget", context);
+    registerLeaf<RunStage>(factory, "RunStage", context);
 }
 
 std::string leafModelXml(const BT::BehaviorTreeFactory & factory)

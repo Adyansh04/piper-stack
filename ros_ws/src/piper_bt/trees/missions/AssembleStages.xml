@@ -1,0 +1,30 @@
+<?xml version="1.0"?>
+<!--
+  Runs the stages of the contact task the skills were started with (skills.launch.py task_file),
+  in order:
+
+    stages=ring;collar;pin;cap
+
+  The first stage that fails ends the run with the arm back at ready.
+-->
+<root BTCPP_format="4">
+  <BehaviorTree ID="AssembleStages">
+    <Sequence name="assemble">
+      <LoopString name="each_stage" queue="{stages}" value="{stage}">
+        <Fallback name="stage_or_back">
+          <RunStage name="run" stage="{stage}"/>
+          <ForceFailure name="give_up">
+            <MoveArmToNamedPose name="back_to_ready" pose="ready"/>
+          </ForceFailure>
+        </Fallback>
+      </LoopString>
+      <MoveArmToNamedPose name="done" pose="ready"/>
+    </Sequence>
+  </BehaviorTree>
+
+  <TreeNodesModel>
+    <SubTree ID="AssembleStages">
+      <input_port name="stages">The stages, separated by semicolons, in the order they run.</input_port>
+    </SubTree>
+  </TreeNodesModel>
+</root>

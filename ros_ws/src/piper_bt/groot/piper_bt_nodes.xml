@@ -49,6 +49,12 @@
             <input_port name="x" type="double" default="0.000000">As for PlaceObject.</input_port>
             <input_port name="mode" type="std::string" default="free">As for PlaceObject: free, relative, metric or anchor.</input_port>
         </Action>
+        <Action ID="RunStage">
+            <input_port name="timeout_s" type="double" default="0.000000">How long the goal may run before it is cancelled, seconds; 0: the executor's goal_timeout_s.</input_port>
+            <input_port name="server_timeout_s" type="double" default="0.000000">How long to wait for the action server, seconds; 0: the executor's server_timeout_s.</input_port>
+            <output_port name="goal_error_m" type="double">How far the stage's part ended from its goal, metres.</output_port>
+            <input_port name="stage" type="std::string">The stage's name in the task's stages, e.g. 'ring'.</input_port>
+        </Action>
         <Action ID="ViewWorkspace">
             <input_port name="timeout_s" type="double" default="0.000000">How long the goal may run before it is cancelled, seconds; 0: the executor's goal_timeout_s.</input_port>
             <input_port name="server_timeout_s" type="double" default="0.000000">How long to wait for the action server, seconds; 0: the executor's server_timeout_s.</input_port>

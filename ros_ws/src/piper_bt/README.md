@@ -29,6 +29,7 @@ Missions (`trees/missions`), each with its keys in the file's `TreeNodesModel`:
 | `ArrangeInRow` | `objects` (`;`-separated), `spacing_m`, `row_y_m` | A row from left to right, `spacing_m` apart |
 | `ClearWorkspace` | `object`, `region` | Moves every match to a region until a look finds none |
 | `ArmToPose` | `pose` | Moves the arm to an SRDF state |
+| `AssembleStages` | `stages` (`;`-separated) | Runs a contact task's stages in order; the first that fails ends the run back at `ready` |
 
 Subtrees (`trees/library`): `PickFromTable` (three tries, looking again after each failed one) and
 `PlaceOnTable` (two tries). Both end with the arm back at `ready` when every try fails. A skill
@@ -47,6 +48,7 @@ a default.
 | `PickObject` | `pick_object` |
 | `PlaceObject` | `place_object` |
 | `PlaceTarget` | `place_target` |
+| `RunStage` | `run_stage` |
 
 Every leaf keeps a tick short: it sends its goal, stays RUNNING, and fails with the reason in the
 root blackboard's `failure` entry when the server is missing, refuses, aborts or takes longer than
