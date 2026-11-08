@@ -14,11 +14,12 @@ namespace piper_lerobot
 /**
  * @brief The frames of the bridge's ZMQ request-reply protocol with LeRobot's plugins.
  * @details Requests: `observe`; `act` and a frame of joint positions; `release`. Replies: `ok`,
- * for `observe` followed by a frame of the state, a frame of the image size and a frame of the
- * image (rgb8, row by row); or `error` and a frame of UTF-8 text. Numbers are little-endian:
- * positions and the state are float64, the image size two uint32 (height, width). The state is the
- * stamp (s), then the measured and the commanded position of each joint (rad, or m for the
- * gripper).
+ * for `observe` followed by a frame of the state, a frame of the episode marker (UTF-8 text, empty
+ * when none was given) and, for each camera, a frame of its name (UTF-8), one of its image's size
+ * and one of the image (rgb8, row by row); or `error` and a frame of UTF-8 text. Numbers are
+ * little-endian: positions and the state are float64, an image size two uint32 (height, width).
+ * The state is the stamp (s), then the measured position, the commanded position and the effort
+ * of each joint (rad, or m for the gripper; N m, or N; NaN for an effort the joints do not report).
  */
 namespace protocol
 {
@@ -34,10 +35,14 @@ inline constexpr std::string_view kError = "error";
  * @param[in] stamp_s Time of the joint readings, s.
  * @param[in] measured Measured position of each joint.
  * @param[in] commanded Commanded position of each joint, the same count.
- * @return The frame: 1 + 2 n float64.
+ * @param[in] effort Effort of each joint, the same count.
+ * @return The frame: 1 + 3 n float64.
  */
 [[nodiscard]] std::vector<std::byte> encodeState(
-    double stamp_s, std::span<const double> measured, std::span<const double> commanded);
+    double stamp_s,
+    std::span<const double> measured,
+    std::span<const double> commanded,
+    std::span<const double> effort);
 
 /**
  * @brief Encodes the image size frame of an `observe` reply.

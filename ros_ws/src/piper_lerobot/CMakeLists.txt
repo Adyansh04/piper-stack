@@ -10,6 +10,7 @@ find_package(rclcpp REQUIRED)
 find_package(rclcpp_action REQUIRED)
 find_package(rclcpp_components REQUIRED)
 find_package(sensor_msgs REQUIRED)
+find_package(std_msgs REQUIRED)
 
 add_library(piper_lerobot_protocol src/bridge_protocol.cpp)
 piper_target_defaults(piper_lerobot_protocol)
@@ -29,6 +30,7 @@ target_link_libraries(lerobot_bridge_component PRIVATE
   rclcpp_action::rclcpp_action
   rclcpp_components::component
   ${sensor_msgs_TARGETS}
+  ${std_msgs_TARGETS}
 )
 rclcpp_components_register_node(lerobot_bridge_component
   PLUGIN "piper_lerobot::LeRobotBridge" EXECUTABLE lerobot_bridge)
@@ -39,6 +41,7 @@ install(TARGETS lerobot_bridge_component
   RUNTIME DESTINATION bin
 )
 install(DIRECTORY config launch DESTINATION share/${PROJECT_NAME})
+install(PROGRAMS scripts/expert_episodes.py DESTINATION lib/${PROJECT_NAME})
 
 if(BUILD_TESTING)
   find_package(ament_cmake_gtest REQUIRED)

@@ -4,22 +4,23 @@ from __future__ import annotations
 
 from typing import Any
 
+import cv2
+import numpy as np
 from lerobot.robots import Robot
 
-from .bridge import BridgeClient
+from .bridge import BridgeClient, Observation
 from .config_piper_ros import PiperRosConfig
 
 #: The arm's joints and the gripper, in the bridge's order; positions in rad, the gripper's in m.
 JOINTS = ('joint1', 'joint2', 'joint3', 'joint4', 'joint5', 'joint6', 'gripper')
-#: The wrist camera's key: ``observation.images.wrist`` in a dataset.
-CAMERA = 'wrist'
 
 
 class PiperRos(Robot):
-    """The Piper through the stack: joint positions and the wrist image in, joint targets out.
+    """The Piper through the stack: joint positions, efforts and camera images in, targets out.
 
     Actions go to the bridge, which turns them into MoveIt Servo joint jogs (collision and limit
-    checked) and gripper goals; a passive robot sends none.
+    checked) and gripper goals; a passive robot sends none. A camera's image is
+    ``observation.images.<name>`` in a dataset, at its configured size.
 
     Args:
         config: The robot's configuration.
@@ -31,18 +32,23 @@ class PiperRos(Robot):
     def __init__(self, config: PiperRosConfig) -> None:
         super().__init__(config)
         self.config = config
+        self._sizes = config.camera_sizes()
         self._bridge: BridgeClient | None = None
+        #: The bridge's last answer to an observation (its episode marker for a recorder).
+        self.last_observation: Observation | None = None
 
     @property
     def observation_features(self) -> dict:
-        """Each joint's position (float) and the wrist image (height, width, 3)."""
-        image = (self.config.image_height, self.config.image_width, 3)
-        return {**{f'{joint}.pos': float for joint in JOINTS}, CAMERA: image}
+        """Each joint's position (and effort, if observed) as floats, each camera (h, w, 3)."""
+        features = {f'{joint}.pos': float for joint in JOINTS}
+        if self.config.effort:
+            features |= {f'{joint}.effort': float for joint in JOINTS}
+        return features | {name: (*size, 3) for name, size in self._sizes.items()}
 
     @property
     def cameras(self) -> dict[str, str]:
         """The cameras by name, with their dataset keys (LeRobot's scripts count them)."""
-        return {CAMERA: f'observation.images.{CAMERA}'}
+        return {name: f'observation.images.{name}' for name in self._sizes}
 
     @property
     def action_features(self) -> dict:
@@ -55,25 +61,29 @@ class PiperRos(Robot):
         return self._bridge is not None
 
     def connect(self, calibrate: bool = True) -> None:
-        """Reach the bridge and check that its image has the configured size.
+        """Reach the bridge and check that it serves every configured camera at a fitting size.
 
         Raises:
             TimeoutError: If the bridge does not answer.
             RuntimeError: If the bridge has no joint state or image yet.
-            ValueError: If the camera's image has another size than configured.
+            ValueError: If a camera is missing, or its image is smaller than configured or of
+                another aspect.
         """
         bridge = BridgeClient(self.config.endpoint, self.config.timeout_s)
         try:
-            shape = bridge.observe().image.shape[:2]
+            images = bridge.observe().images
+            for name, (height, width) in self._sizes.items():
+                if name not in images:
+                    raise ValueError(f'The bridge serves no {name} camera (it has {list(images)})')
+                h, w = images[name].shape[:2]
+                if h < height or w < width or h * width != w * height:
+                    raise ValueError(
+                        f'The {name} image is {h} x {w}, which does not scale down to the '
+                        f'configured {height} x {width}'
+                    )
         except Exception:
             bridge.close()
             raise
-        if shape != (self.config.image_height, self.config.image_width):
-            bridge.close()
-            raise ValueError(
-                f'The wrist image is {shape[0]} x {shape[1]}, the robot is configured for '
-                f'{self.config.image_height} x {self.config.image_width}'
-            )
         self._bridge = bridge
 
     @property
@@ -88,12 +98,24 @@ class PiperRos(Robot):
         """Nothing to do: the stack configures the arm."""
 
     def get_observation(self) -> dict[str, Any]:
-        """Return each joint's measured position and the wrist image."""
+        """Return each joint's measured position (and effort) and every camera's image."""
         observation = self._bridge.observe()
-        positions = dict(
+        self.last_observation = observation
+        out: dict[str, Any] = dict(
             zip((f'{joint}.pos' for joint in JOINTS), map(float, observation.measured), strict=True)
         )
-        return {**positions, CAMERA: observation.image}
+        if self.config.effort:
+            # A joint that reports no effort reads 0, so a dataset never holds NaN.
+            efforts = np.nan_to_num(observation.effort, nan=0.0)
+            out |= dict(
+                zip((f'{joint}.effort' for joint in JOINTS), map(float, efforts), strict=True)
+            )
+        for name, (height, width) in self._sizes.items():
+            image = observation.images[name]
+            if image.shape[:2] != (height, width):
+                image = cv2.resize(image, (width, height), interpolation=cv2.INTER_AREA)
+            out[name] = image
+        return out
 
     def send_action(self, action: dict[str, Any]) -> dict[str, Any]:
         """Send the joint targets to the bridge, unless passive; return the action as given."""

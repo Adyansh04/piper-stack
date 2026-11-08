@@ -25,15 +25,16 @@ std::vector<std::byte> bytesOf(std::span<const double> values)
     return bytes;
 }
 
-TEST(BridgeProtocol, EncodesTheStampThenMeasuredThenCommanded)
+TEST(BridgeProtocol, EncodesTheStampThenMeasuredThenCommandedThenEffort)
 {
     const std::array<double, 2> measured{0.1, -0.2};
     const std::array<double, 2> commanded{0.3, 0.035};
-    const auto frame = encodeState(12.5, measured, commanded);
-    ASSERT_EQ(frame.size(), 5 * sizeof(double));
-    std::array<double, 5> values{};
+    const std::array<double, 2> effort{2.5, -1.0};
+    const auto frame = encodeState(12.5, measured, commanded, effort);
+    ASSERT_EQ(frame.size(), 7 * sizeof(double));
+    std::array<double, 7> values{};
     std::memcpy(values.data(), frame.data(), frame.size());
-    EXPECT_EQ(values, (std::array<double, 5>{12.5, 0.1, -0.2, 0.3, 0.035}));
+    EXPECT_EQ(values, (std::array<double, 7>{12.5, 0.1, -0.2, 0.3, 0.035, 2.5, -1.0}));
 }
 
 TEST(BridgeProtocol, EncodesTheImageSizeAsHeightThenWidth)

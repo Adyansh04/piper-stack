@@ -1,6 +1,6 @@
 // Serves LeRobot's plugins, which run in their own Python 3.12 environment outside ROS, over ZMQ:
-// the arm's joint state and wrist image, and joint targets that become MoveIt Servo joint jogs
-// (collision and limit checked) and gripper goals.
+// the arm's joint state, its cameras' images and an episode marker, and joint targets that become
+// MoveIt Servo joint jogs (collision and limit checked) and gripper goals.
 
 #include <algorithm>
 #include <chrono>
@@ -13,6 +13,7 @@
 #include <memory>
 #include <mutex>
 #include <span>
+#include <stdexcept>
 #include <stop_token>
 #include <string>
 #include <string_view>
@@ -34,6 +35,7 @@
 #include "rclcpp_components/register_node_macro.hpp"
 #include "sensor_msgs/msg/image.hpp"
 #include "sensor_msgs/msg/joint_state.hpp"
+#include "std_msgs/msg/string.hpp"
 
 namespace piper_lerobot
 {
@@ -48,6 +50,25 @@ std::vector<std::string> withGripper(std::vector<std::string> arm, const std::st
 {
     arm.push_back(gripper);
     return arm;
+}
+
+// An image as rgb8 rows without padding, whichever of rgb8 and bgr8 it came in.
+zmq::message_t rgbPixels(const sensor_msgs::msg::Image & image)
+{
+    zmq::message_t pixels(static_cast<std::size_t>(image.height) * image.width * 3);
+    auto * out = static_cast<std::uint8_t *>(pixels.data());
+    const bool bgr = image.encoding == "bgr8";
+    for (std::uint32_t row = 0; row < image.height; ++row)
+    {
+        const std::uint8_t * in = &image.data[static_cast<std::size_t>(row) * image.step];
+        for (std::uint32_t col = 0; col < image.width; ++col, in += 3, out += 3)
+        {
+            out[0] = bgr ? in[2] : in[0];
+            out[1] = in[1];
+            out[2] = bgr ? in[0] : in[2];
+        }
+    }
+    return pixels;
 }
 
 }  // namespace
@@ -68,8 +89,11 @@ public:
         , gripper_effort_nm_(declare_parameter("gripper_effort_nm", 1.0))
         , endpoint_(declare_parameter("endpoint", std::string("tcp://127.0.0.1:5590")))
         , joints_(withGripper(arm_joints_, gripper_joint_))
+        , cameras_(declare_parameter("cameras", std::vector<std::string>{"wrist"}))
         , measured_(joints_.size(), std::numeric_limits<double>::quiet_NaN())
         , commanded_(joints_.size(), std::numeric_limits<double>::quiet_NaN())
+        , effort_(joints_.size(), std::numeric_limits<double>::quiet_NaN())
+        , images_(cameras_.size())
         , jog_pub_(
               create_publisher<control_msgs::msg::JointJog>(
                   declare_parameter("jog_topic", std::string("/servo_node/delta_joint_cmds")),
@@ -94,10 +118,30 @@ public:
             [this](const control_msgs::msg::JointTrajectoryControllerState & msg) {
                 onControllerState(msg);
             });
-        image_sub_ = create_subscription<sensor_msgs::msg::Image>(
-            declare_parameter("image_topic", std::string("/wrist_camera/color/image_raw")),
-            rclcpp::SensorDataQoS(),
-            [this](sensor_msgs::msg::Image::ConstSharedPtr msg) { onImage(std::move(msg)); });
+        const auto topics = declare_parameter(
+            "camera_topics", std::vector<std::string>{"/wrist_camera/color/image_raw"});
+        if (topics.size() != cameras_.size())
+        {
+            throw std::invalid_argument("cameras and camera_topics must have the same length");
+        }
+        for (std::size_t i = 0; i < cameras_.size(); ++i)
+        {
+            image_subs_.push_back(
+                create_subscription<sensor_msgs::msg::Image>(
+                    topics[i],
+                    rclcpp::SensorDataQoS(),
+                    [this, i](sensor_msgs::msg::Image::ConstSharedPtr msg) {
+                        onImage(i, std::move(msg));
+                    }));
+        }
+        // Latched: a marker given before the bridge started still counts.
+        episode_sub_ = create_subscription<std_msgs::msg::String>(
+            declare_parameter("episode_topic", std::string("/lerobot/episode")),
+            rclcpp::QoS(1).reliable().transient_local(),
+            [this](const std_msgs::msg::String & msg) {
+                const std::scoped_lock lock(mutex_);
+                episode_ = msg.data;
+            });
         timer_ = create_wall_timer(
             std::chrono::duration<double>(1.0 / declare_parameter("jog_rate_hz", 100.0)),
             [this] { jog(); });
@@ -112,14 +156,19 @@ private:
         {
             return;
         }
+        const bool efforts = msg.effort.size() == msg.name.size();
         const std::scoped_lock lock(mutex_);
         for (std::size_t i = 0; i < msg.name.size(); ++i)
         {
             const auto joint = std::ranges::find(joints_, msg.name[i]);
             if (joint != joints_.end())
             {
-                measured_[static_cast<std::size_t>(std::distance(joints_.begin(), joint))] =
-                    msg.position[i];
+                const auto k = static_cast<std::size_t>(std::distance(joints_.begin(), joint));
+                measured_[k] = msg.position[i];
+                if (efforts)
+                {
+                    effort_[k] = msg.effort[i];
+                }
             }
         }
         // The gripper controller publishes no command: its measured opening stands in.
@@ -145,7 +194,7 @@ private:
         }
     }
 
-    void onImage(sensor_msgs::msg::Image::ConstSharedPtr msg)
+    void onImage(std::size_t camera, sensor_msgs::msg::Image::ConstSharedPtr msg)
     {
         if (msg->encoding != "rgb8" && msg->encoding != "bgr8")
         {
@@ -154,7 +203,7 @@ private:
             return;
         }
         const std::scoped_lock lock(mutex_);
-        image_ = std::move(msg);
+        images_[camera] = std::move(msg);
     }
 
     void jog()
@@ -291,40 +340,37 @@ private:
 
     std::vector<zmq::message_t> observe()
     {
-        sensor_msgs::msg::Image::ConstSharedPtr image;
+        std::vector<sensor_msgs::msg::Image::ConstSharedPtr> images;
         std::vector<std::byte> state;
+        std::string episode;
         {
             const std::scoped_lock lock(mutex_);
             if (std::ranges::any_of(measured_, [](double value) { return std::isnan(value); }))
             {
                 return refuse("no joint state yet");
             }
-            if (!image_)
+            for (std::size_t i = 0; i < cameras_.size(); ++i)
             {
-                return refuse("no camera image yet");
+                if (!images_[i])
+                {
+                    return refuse(std::format("no image from the {} camera yet", cameras_[i]));
+                }
             }
-            image = image_;
-            state = encodeState(stamp_s_, measured_, commanded_);
-        }
-        const auto size = encodeImageSize(image->height, image->width);
-        zmq::message_t pixels(static_cast<std::size_t>(image->height) * image->width * 3);
-        auto * out = static_cast<std::uint8_t *>(pixels.data());
-        const bool bgr = image->encoding == "bgr8";
-        for (std::uint32_t row = 0; row < image->height; ++row)
-        {
-            const std::uint8_t * in = &image->data[static_cast<std::size_t>(row) * image->step];
-            for (std::uint32_t col = 0; col < image->width; ++col, in += 3, out += 3)
-            {
-                out[0] = bgr ? in[2] : in[0];
-                out[1] = in[1];
-                out[2] = bgr ? in[0] : in[2];
-            }
+            images = images_;
+            state = encodeState(stamp_s_, measured_, commanded_, effort_);
+            episode = episode_;
         }
         std::vector<zmq::message_t> reply;
         reply.emplace_back(protocol::kOk);
         reply.emplace_back(state.data(), state.size());
-        reply.emplace_back(size.data(), size.size());
-        reply.push_back(std::move(pixels));
+        reply.emplace_back(episode);
+        for (std::size_t i = 0; i < cameras_.size(); ++i)
+        {
+            const auto size = encodeImageSize(images[i]->height, images[i]->width);
+            reply.emplace_back(cameras_[i]);
+            reply.emplace_back(size.data(), size.size());
+            reply.push_back(rgbPixels(*images[i]));
+        }
         return reply;
     }
 
@@ -353,14 +399,18 @@ private:
     std::string endpoint_;
     // The arm's joints then the gripper's: the order of every position frame.
     std::vector<std::string> joints_;
+    // The cameras' names, in the order of the reply's images.
+    std::vector<std::string> cameras_;
     double gripper_goal_m_ = std::numeric_limits<double>::quiet_NaN();
 
     // Guards everything below, shared by the executor's callbacks and the ZMQ thread.
     std::mutex mutex_;
     std::vector<double> measured_;
     std::vector<double> commanded_;
+    std::vector<double> effort_;
     double stamp_s_ = 0.0;
-    sensor_msgs::msg::Image::ConstSharedPtr image_;
+    std::vector<sensor_msgs::msg::Image::ConstSharedPtr> images_;
+    std::string episode_;
     std::vector<double> target_;
     rclcpp::Time target_stamp_;
     bool active_ = false;
@@ -372,7 +422,8 @@ private:
     rclcpp::Subscription<sensor_msgs::msg::JointState>::SharedPtr joint_sub_;
     rclcpp::Subscription<control_msgs::msg::JointTrajectoryControllerState>::SharedPtr
         reference_sub_;
-    rclcpp::Subscription<sensor_msgs::msg::Image>::SharedPtr image_sub_;
+    std::vector<rclcpp::Subscription<sensor_msgs::msg::Image>::SharedPtr> image_subs_;
+    rclcpp::Subscription<std_msgs::msg::String>::SharedPtr episode_sub_;
     rclcpp::TimerBase::SharedPtr timer_;
     zmq::context_t context_{1};
     // Last: destroyed first, so the server thread stops before what it uses goes.

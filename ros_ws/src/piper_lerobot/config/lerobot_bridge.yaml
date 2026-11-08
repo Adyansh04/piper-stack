@@ -8,7 +8,12 @@ lerobot_bridge:
     joint_state_topic: "/joint_states"
     # The trajectory controller's reference: what the arm is commanded to, for the teleoperator.
     controller_state_topic: "/arm_controller/controller_state"
-    image_topic: "/wrist_camera/color/image_raw"
+    # The cameras each observe reply carries, by name (the plugins' camera keys), and their colour
+    # images (rgb8 or bgr8).
+    cameras: [wrist, overhead]
+    camera_topics: ["/wrist_camera/color/image_raw", "/overhead_camera/color/image_raw"]
+    # The recorder's episode marker (std_msgs/String, latched), passed through to the plugins.
+    episode_topic: "/lerobot/episode"
     # MoveIt Servo's joint jog input and command-type switch (piper_moveit_config's servo.yaml).
     jog_topic: "/servo_node/delta_joint_cmds"
     command_type_service: "/servo_node/switch_command_type"

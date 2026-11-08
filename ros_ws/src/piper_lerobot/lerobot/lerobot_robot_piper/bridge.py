@@ -1,7 +1,8 @@
-"""A client of piper_lerobot's bridge node: the arm's state and wrist image, and joint targets.
+"""A client of piper_lerobot's bridge node: the arm's state, its cameras and joint targets.
 
 The protocol is the bridge's (``include/piper_lerobot/bridge_protocol.hpp``): ZMQ request-reply,
-little-endian float64 positions, the image as rgb8 rows.
+little-endian float64 positions and efforts, the episode marker as text, each camera's image as
+rgb8 rows after its name and size.
 """
 
 from __future__ import annotations
@@ -22,8 +23,12 @@ class Observation:
     measured: np.ndarray
     #: Commanded position of each joint, in the same order and units.
     commanded: np.ndarray
-    #: The wrist camera's colour image, height x width x 3, RGB, read-only.
-    image: np.ndarray
+    #: Effort of each joint, in N m (N for the gripper); NaN where the joints report none.
+    effort: np.ndarray
+    #: The recorder's episode marker, as last given on the stack (empty when none was).
+    episode: str
+    #: Each camera's colour image by name, height x width x 3, RGB, read-only.
+    images: dict[str, np.ndarray]
 
 
 class BridgeClient:
@@ -63,22 +68,30 @@ class BridgeClient:
         return reply
 
     def observe(self) -> Observation:
-        """Return the arm's latest state and wrist image.
+        """Return the arm's latest state, the episode marker and every camera's image.
 
         Raises:
             TimeoutError: If the bridge does not answer in time.
             RuntimeError: If the bridge has no joint state or image yet.
         """
-        _, state_frame, size_frame, image_frame = self._request([b'observe'])
-        state = np.frombuffer(state_frame, dtype='<f8')
-        joints = (state.size - 1) // 2
-        height, width = (int(v) for v in np.frombuffer(size_frame, dtype='<u4'))
-        image = np.frombuffer(image_frame, dtype=np.uint8).reshape(height, width, 3)
+        reply = self._request([b'observe'])
+        state = np.frombuffer(reply[1], dtype='<f8')
+        joints = (state.size - 1) // 3
+        images = {}
+        for name, size_frame, image_frame in zip(
+            reply[3::3], reply[4::3], reply[5::3], strict=True
+        ):
+            height, width = (int(v) for v in np.frombuffer(size_frame, dtype='<u4'))
+            images[name.decode()] = np.frombuffer(image_frame, dtype=np.uint8).reshape(
+                height, width, 3
+            )
         return Observation(
             stamp_s=float(state[0]),
             measured=state[1 : 1 + joints],
-            commanded=state[1 + joints :],
-            image=image,
+            commanded=state[1 + joints : 1 + 2 * joints],
+            effort=state[1 + 2 * joints :],
+            episode=reply[2].decode(),
+            images=images,
         )
 
     def act(self, positions: list[float]) -> None:

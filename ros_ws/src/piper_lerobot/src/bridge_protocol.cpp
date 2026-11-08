@@ -32,18 +32,20 @@ void append(std::vector<std::byte> & frame, T value)
 }  // namespace
 
 std::vector<std::byte> encodeState(
-    double stamp_s, std::span<const double> measured, std::span<const double> commanded)
+    double stamp_s,
+    std::span<const double> measured,
+    std::span<const double> commanded,
+    std::span<const double> effort)
 {
     std::vector<std::byte> frame;
-    frame.reserve(sizeof(double) * (1 + measured.size() + commanded.size()));
+    frame.reserve(sizeof(double) * (1 + measured.size() + commanded.size() + effort.size()));
     append(frame, stamp_s);
-    for (const double value : measured)
+    for (const auto values : {measured, commanded, effort})
     {
-        append(frame, value);
-    }
-    for (const double value : commanded)
-    {
-        append(frame, value);
+        for (const double value : values)
+        {
+            append(frame, value);
+        }
     }
     return frame;
 }
