@@ -113,8 +113,9 @@ Policy loadPolicy(const std::string & model_path, std::size_t joints)
  * @brief Moves the arm by a trained reach policy through MoveIt Servo's joint jogs.
  * @details While active, every `1 / jog_rate_hz` a JointRamp moves each joint's command towards
  * the position the policy wants (`action_offset` plus `action_scale` times its action) under
- * `max_velocity` and `max_acceleration`, from the measured positions at activation; the ramp's
- * velocities go to Servo as a JointJog. Every `jog_rate_hz / policy_rate_hz` steps the policy reads
+ * `max_velocity` and `max_acceleration`, from the measured positions at activation. The ramp's
+ * velocity plus `tracking_gain` times the gap between its command and the measured position,
+ * capped at `max_velocity`, goes to Servo as a JointJog. Every `jog_rate_hz / policy_rate_hz` steps the policy reads
  * [joint positions (rad), joint velocities (rad/s), target position (m), target quaternion x y z
  * w, in `frame`] and gives the actions. This is the motion the reach task in `lab/` trains with.
  *
@@ -143,8 +144,11 @@ public:
         , decimation_(decimationOf(jog_period_s_, declare_parameter("policy_rate_hz", 50.0)))
         , ramp_(makeRamp())
         , policy_(loadPolicy(model_path_, joints_.size()))
+        , tracking_gain_(declare_parameter("tracking_gain", 5.0))
+        , max_velocity_rad_s_(get_parameter("max_velocity").as_double())
     {
         const std::size_t joints = joints_.size();
+        velocities_.assign(joints, 0.0);
         for (std::size_t i = 0; i < joints; ++i)
         {
             index_.emplace(joints_[i], i);
@@ -321,8 +325,18 @@ private:
             }
         }
         cycle_ = (cycle_ + 1) % decimation_;
-        std::ignore = ramp.step(jog_period_s_);
-        const std::span<const double> velocities = ramp.velocities();
+        const std::span<const double> commands = ramp.step(jog_period_s_);
+        const std::span<const double> ramp_velocities = ramp.velocities();
+        // Servo moves on from the measured state each step, so a lag would stay as a shortfall:
+        // the jog also closes the gap to the ramp's command, which is what training tracks.
+        for (std::size_t i = 0; i < velocities_.size(); ++i)
+        {
+            velocities_[i] = std::clamp(
+                ramp_velocities[i] + tracking_gain_ * (commands[i] - positions_rad_[i]),
+                -max_velocity_rad_s_,
+                max_velocity_rad_s_);
+        }
+        const std::span<const double> velocities = velocities_;
         const rclcpp::Time now = get_clock()->now();
         // Servo aborts on a jog stamped zero: the simulator's clock has not come yet.
         if (now.nanoseconds() == 0)
@@ -350,6 +364,11 @@ private:
     unsigned int cycle_ = 0;
     JointRamp ramp_;
     Policy policy_;
+    // How fast a jog closes the gap between the ramp's command and the measured position, 1/s.
+    double tracking_gain_;
+    double max_velocity_rad_s_;
+    // The jog velocities, rad/s: sized once, reused every step.
+    std::vector<double> velocities_;
     std::unordered_map<std::string, std::size_t> index_;
     std::vector<double> positions_rad_;
     std::vector<double> velocities_rad_s_;

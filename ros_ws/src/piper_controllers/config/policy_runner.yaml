@@ -20,6 +20,9 @@ policy_runner:
     # firmware's own acceleration cap, in rad/s^2.
     max_velocity: 1.0
     max_acceleration: 0.5
+    # How fast a jog closes the gap between the ramp's command and the measured position, 1/s:
+    # Servo moves on from the measured state, so without it a tracking lag stays as a shortfall.
+    tracking_gain: 5.0
     # MoveIt Servo's joint jog input and the service that switches it to joint jogs.
     jog_topic: "/servo_node/delta_joint_cmds"
     command_type_service: "/servo_node/switch_command_type"

@@ -34,8 +34,10 @@ that box. On the real arm, the first run of a policy goes at reduced caps, with 
   action, inside the URDF's limits.
 - Every ramp step `JointRamp` moves each joint's command towards it: the commanded velocity is the
   fastest from which the joint still stops at the wanted position, at most `max_velocity`, and
-  changes by at most `max_acceleration`. Those velocities go to Servo as a joint jog, stamped on
-  the ROS clock.
+  changes by at most `max_acceleration`. The jog sent to Servo, stamped on the ROS clock, is that
+  velocity plus `tracking_gain` (5/s) times the gap between the command and the measured
+  position, at most `max_velocity`: Servo moves on from the measured state, so without it a
+  tracking lag would stay as a shortfall.
 - A target in another frame, or with a non-finite position or no orientation, is ignored. If
   inference fails, or an action is not finite, the joints come to rest where they are.
   `~/set_active` false brings them to rest under the caps, then the runner stops sending.
@@ -57,8 +59,8 @@ that box. On the real arm, the first run of a policy goes at reduced caps, with 
 In `config/policy_runner.yaml`: `joints`, `model_path` (set by the launch), `frame`
 (`base_link`), `policy_rate_hz` (50), `jog_rate_hz` (200, the training's physics rate),
 `action_offset` (`ready`), `action_scale` (0.5 rad), `max_velocity` (1 rad/s, a third of the
-firmware's cap), `max_acceleration` (0.5 rad/s^2, the firmware's cap), and Servo's topic and
-service. The joint limits come from `robot_description` (the launch expands
+firmware's cap), `max_acceleration` (0.5 rad/s^2, the firmware's cap), `tracking_gain` (5/s), and
+Servo's topic and service. The joint limits come from `robot_description` (the launch expands
 `piper_description`). A policy works only with the values it was trained with: retrain after
 changing any of them.
 
