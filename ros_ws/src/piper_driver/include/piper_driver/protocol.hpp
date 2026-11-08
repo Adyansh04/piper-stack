@@ -33,6 +33,11 @@ inline constexpr std::uint32_t kJointCtrl12 = 0x155;      ///< Joint 1 and 2 tar
 inline constexpr std::uint32_t kJointCtrl34 = 0x156;      ///< Joint 3 and 4 targets.
 inline constexpr std::uint32_t kJointCtrl56 = 0x157;      ///< Joint 5 and 6 targets.
 inline constexpr std::uint32_t kGripperCtrl = 0x159;      ///< Gripper target.
+inline constexpr std::uint32_t kMitCtrl1 = 0x15A;         ///< Joint 1 MIT command (to 0x15F).
+inline constexpr std::uint32_t kMitCtrl6 = 0x15F;         ///< Joint 6 MIT command.
+inline constexpr std::uint32_t kParamQuery = 0x477;       ///< Parameter query, end load setting.
+inline constexpr std::uint32_t kCollisionLevel = 0x47A;   ///< Collision protection levels.
+inline constexpr std::uint32_t kCollisionReply = 0x47B;   ///< Reply: collision levels.
 inline constexpr std::uint32_t kMotorEnable = 0x471;      ///< Motor enable and disable.
 inline constexpr std::uint32_t kLimitQuery = 0x472;       ///< Joint limit query.
 inline constexpr std::uint32_t kLimitAngleSpeed = 0x473;  ///< Reply: angle limits, max speed.
@@ -67,6 +72,7 @@ inline constexpr std::uint32_t kGripper = 0x2A8;    ///< Gripper stroke, torque,
         case 0x475:
         case 0x477:
         case 0x479:
+        case 0x47A:
         case 0x47D:
             return true;
         default:
@@ -204,7 +210,7 @@ inline bool decodeJoints(const Frame & frame, std::span<double, kJointCount> pos
     {
         return false;
     }
-    const std::size_t first = 2 * (frame.id - id::kJoint12);
+    const auto first = 2 * std::size_t{frame.id - id::kJoint12};
     position_rad[first] = detail::beI32(frame.data, 0) * kRadPerMilliDeg;
     position_rad[first + 1] = detail::beI32(frame.data, 4) * kRadPerMilliDeg;
     return true;
@@ -299,8 +305,11 @@ constexpr Frame encodeEnableAll(bool enable) noexcept
 /// @param ctrl Control mode.
 /// @param move Motion mode.
 /// @param speed_percent Firmware speed scaling, clamped to 0 to 100.
-/// @return The frame, with position-velocity (non-MIT) mode and no installation change.
-constexpr Frame encodeMode(CtrlMode ctrl, MoveMode move, int speed_percent) noexcept
+/// @param mit True for MIT (per-joint impedance) commands on 0x15A to 0x15F, false for
+///            position-velocity commands.
+/// @return The frame, with no installation change.
+constexpr Frame encodeMode(
+    CtrlMode ctrl, MoveMode move, int speed_percent, bool mit = false) noexcept
 {
     return Frame{
         .id = id::kMotionCtrl2,
@@ -309,7 +318,7 @@ constexpr Frame encodeMode(CtrlMode ctrl, MoveMode move, int speed_percent) noex
             static_cast<std::uint8_t>(ctrl),
             static_cast<std::uint8_t>(move),
             static_cast<std::uint8_t>(std::clamp(speed_percent, 0, 100)),
-            0x00,
+            static_cast<std::uint8_t>(mit ? 0xAD : 0x00),
             0,
             0,
             0,
@@ -353,7 +362,7 @@ inline bool decodeJointTargets(
     {
         return false;
     }
-    const std::size_t first = 2 * (frame.id - id::kJointCtrl12);
+    const auto first = 2 * std::size_t{frame.id - id::kJointCtrl12};
     position_rad[first] = detail::beI32(frame.data, 0) * kRadPerMilliDeg;
     position_rad[first + 1] = detail::beI32(frame.data, 4) * kRadPerMilliDeg;
     return true;
@@ -380,6 +389,163 @@ inline Frame encodeGripper(double stroke_m, double effort_nm) noexcept
 constexpr Frame encodeFirmwareQuery() noexcept
 {
     return Frame{.id = id::kFirmware, .length = 8, .data = {0x01, 0, 0, 0, 0, 0, 0, 0}};
+}
+
+/// @brief One joint's MIT command: the motor driver applies
+/// torque = kp (position - q) + kd (velocity - dq) + torque_ff.
+struct MitCommand
+{
+    double position_rad = 0.0;    ///< Target position, within +-12.5 rad.
+    double velocity_rad_s = 0.0;  ///< Target velocity, within +-45 rad/s.
+    double kp = 0.0;              ///< Position gain, 0 to 500 (N m per rad).
+    double kd = 0.0;              ///< Velocity gain, -5 to 5 (N m s per rad).
+    double torque_nm = 0.0;       ///< Feed-forward torque, within +-8 N m.
+};
+
+/// @brief Ranges of the MIT command fields, as the firmware scales them.
+inline constexpr double kMitPositionRad = 12.5;
+inline constexpr double kMitVelocityRadS = 45.0;
+inline constexpr double kMitKpMax = 500.0;
+inline constexpr double kMitKdRange = 5.0;
+inline constexpr double kMitTorqueNm = 8.0;
+
+namespace detail
+{
+/// @brief Scales x in [lo, hi] (clamped) to an unsigned field of the given width, truncating.
+inline std::uint32_t toField(double x, double lo, double hi, unsigned bits) noexcept
+{
+    const auto full = static_cast<double>((1U << bits) - 1U);
+    return static_cast<std::uint32_t>((std::clamp(x, lo, hi) - lo) * full / (hi - lo));
+}
+
+/// @brief The inverse of toField.
+inline double fromField(std::uint32_t v, double lo, double hi, unsigned bits) noexcept
+{
+    return lo + (static_cast<double>(v) * (hi - lo) / static_cast<double>((1U << bits) - 1U));
+}
+}  // namespace detail
+
+/// @brief Encodes one joint's MIT command (0x15A to 0x15F); fields are clamped to their ranges.
+/// @param joint Joint index, 0 to 5.
+/// @param command The command.
+/// @return The frame, with its 4-bit checksum.
+inline Frame encodeMit(std::size_t joint, const MitCommand & command) noexcept
+{
+    const auto pos = detail::toField(command.position_rad, -kMitPositionRad, kMitPositionRad, 16);
+    const auto vel =
+        detail::toField(command.velocity_rad_s, -kMitVelocityRadS, kMitVelocityRadS, 12);
+    const auto kp = detail::toField(command.kp, 0.0, kMitKpMax, 12);
+    const auto kd = detail::toField(command.kd, -kMitKdRange, kMitKdRange, 12);
+    const auto torque = detail::toField(command.torque_nm, -kMitTorqueNm, kMitTorqueNm, 8);
+    Frame frame{
+        .id = id::kMitCtrl1 + static_cast<std::uint32_t>(std::min(joint, kJointCount - 1)),
+        .length = 8,
+        .data = {}};
+    frame.data[0] = static_cast<std::uint8_t>(pos >> 8U);
+    frame.data[1] = static_cast<std::uint8_t>(pos & 0xFFU);
+    frame.data[2] = static_cast<std::uint8_t>(vel >> 4U);
+    frame.data[3] = static_cast<std::uint8_t>(((vel & 0x0FU) << 4U) | (kp >> 8U));
+    frame.data[4] = static_cast<std::uint8_t>(kp & 0xFFU);
+    frame.data[5] = static_cast<std::uint8_t>(kd >> 4U);
+    frame.data[6] = static_cast<std::uint8_t>(((kd & 0x0FU) << 4U) | (torque >> 4U));
+    std::uint8_t crc = 0;
+    for (std::size_t i = 0; i < 7; ++i)
+    {
+        crc ^= frame.data[i];
+    }
+    frame.data[7] = static_cast<std::uint8_t>(((torque & 0x0FU) << 4U) | (crc & 0x0FU));
+    return frame;
+}
+
+/// @brief Decodes an MIT command, for the fake arm and bus monitors.
+/// @param frame Received frame.
+/// @return The joint index and the command, or nothing if the frame is not a valid MIT command.
+inline std::optional<std::pair<std::size_t, MitCommand>> decodeMit(const Frame & frame) noexcept
+{
+    if (frame.id < id::kMitCtrl1 || frame.id > id::kMitCtrl6 || frame.length < 8)
+    {
+        return std::nullopt;
+    }
+    const auto & d = frame.data;
+    std::uint8_t crc = 0;
+    for (std::size_t i = 0; i < 7; ++i)
+    {
+        crc ^= d[i];
+    }
+    if ((crc & 0x0FU) != (d[7] & 0x0FU))
+    {
+        return std::nullopt;
+    }
+    const std::uint32_t pos = (std::uint32_t{d[0]} << 8U) | d[1];
+    const std::uint32_t vel = (std::uint32_t{d[2]} << 4U) | (std::uint32_t{d[3]} >> 4U);
+    const std::uint32_t kp = ((std::uint32_t{d[3]} & 0x0FU) << 8U) | d[4];
+    const std::uint32_t kd = (std::uint32_t{d[5]} << 4U) | (std::uint32_t{d[6]} >> 4U);
+    const std::uint32_t torque =
+        ((std::uint32_t{d[6]} & 0x0FU) << 4U) | (std::uint32_t{d[7]} >> 4U);
+    return std::pair{
+        std::size_t{frame.id - id::kMitCtrl1},
+        MitCommand{
+            .position_rad = detail::fromField(pos, -kMitPositionRad, kMitPositionRad, 16),
+            .velocity_rad_s = detail::fromField(vel, -kMitVelocityRadS, kMitVelocityRadS, 12),
+            .kp = detail::fromField(kp, 0.0, kMitKpMax, 12),
+            .kd = detail::fromField(kd, -kMitKdRange, kMitKdRange, 12),
+            .torque_nm = detail::fromField(torque, -kMitTorqueNm, kMitTorqueNm, 8)}};
+}
+
+/// @brief The highest collision protection level; 0 turns the protection off.
+inline constexpr std::uint8_t kMaxCollisionLevel = 8;
+
+/// @brief Encodes the collision protection levels (0x47A), clamped to 0 to 8 per joint.
+/// @param levels Level per joint.
+/// @return The frame.
+inline Frame encodeCollisionLevels(std::span<const std::uint8_t, kJointCount> levels) noexcept
+{
+    Frame frame{.id = id::kCollisionLevel, .length = 8, .data = {}};
+    for (std::size_t i = 0; i < kJointCount; ++i)
+    {
+        frame.data[i] = std::min(levels[i], kMaxCollisionLevel);
+    }
+    return frame;
+}
+
+/// @brief Encodes the query of the collision levels (0x477 byte 0 = 0x02); the reply is 0x47B.
+constexpr Frame encodeCollisionLevelQuery() noexcept
+{
+    return Frame{.id = id::kParamQuery, .length = 8, .data = {0x02, 0, 0, 0, 0, 0, 0, 0}};
+}
+
+/// @brief Decodes the collision levels from a 0x47B reply (or a 0x47A command).
+/// @param frame Received frame.
+/// @return Level per joint, or nothing for another frame.
+inline std::optional<std::array<std::uint8_t, kJointCount>> decodeCollisionLevels(
+    const Frame & frame) noexcept
+{
+    if ((frame.id != id::kCollisionReply && frame.id != id::kCollisionLevel) || frame.length < 6)
+    {
+        return std::nullopt;
+    }
+    std::array<std::uint8_t, kJointCount> levels{};
+    std::copy_n(frame.data.begin(), kJointCount, levels.begin());
+    return levels;
+}
+
+/// @brief The payload the firmware compensates for (0x477 byte 4).
+enum class EndLoad : std::uint8_t
+{
+    kEmpty = 0x00,
+    kHalf = 0x01,
+    kFull = 0x02
+};
+
+/// @brief Encodes the end load setting (0x477, byte 3 = 0xAE makes byte 4 take effect).
+/// @param load The payload class.
+/// @return The frame.
+constexpr Frame encodeEndLoad(EndLoad load) noexcept
+{
+    return Frame{
+        .id = id::kParamQuery,
+        .length = 8,
+        .data = {0, 0, 0, 0xAE, static_cast<std::uint8_t>(load), 0, 0, 0}};
 }
 
 }  // namespace piper_driver::protocol

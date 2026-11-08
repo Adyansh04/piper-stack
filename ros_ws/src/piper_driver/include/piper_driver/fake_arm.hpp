@@ -55,6 +55,12 @@ public:
     /// @brief Whether the motors are enabled.
     [[nodiscard]] bool enabled() const;
 
+    /// @brief Returns the collision levels last set over the bus.
+    [[nodiscard]] std::array<std::uint8_t, protocol::kJointCount> collisionLevels() const;
+
+    /// @brief Returns the end load last set over the bus (0x477 byte 4).
+    [[nodiscard]] std::uint8_t endLoad() const;
+
 private:
     explicit FakeArm(CanBus bus, const Options & options);
     void run(const std::stop_token & stop);
@@ -72,6 +78,9 @@ private:
     bool stopped_ = false;
     std::uint8_t ctrl_mode_ = 0;
     std::uint8_t move_mode_ = 0;
+    bool mit_ = false;
+    std::array<std::uint8_t, protocol::kJointCount> collision_levels_{};
+    std::uint8_t end_load_ = 0;
     int speed_percent_ = 0;
     std::jthread runner_;  // Last: it stops and joins before the members it uses go.
 };

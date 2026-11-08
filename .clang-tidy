@@ -63,8 +63,10 @@ FormatStyle: file
 CheckOptions:
   # ROS headers are used through umbrella includes (rclcpp/rclcpp.hpp) and message headers, so
   # they are exempt, and so are Eigen's and OpenCV's (Eigen/Geometry, opencv2/core.hpp), whose
-  # symbols live in internal headers. The std and project headers are checked.
-  misc-include-cleaner.IgnoreHeaders: '/opt/ros/.*;.*/(msg|srv|action)/.*;.*/eigen3/Eigen/.*;.*/opencv4/opencv2/.*'
+  # symbols live in internal headers, and glibc's and libstdc++'s internal ones (bits/, asm/,
+  # asm-generic/, sys/poll.h) that the check maps POSIX symbols and chrono literals to. The std
+  # and project headers are checked.
+  misc-include-cleaner.IgnoreHeaders: '/opt/ros/.*;.*/(msg|srv|action)/.*;.*/eigen3/Eigen/.*;.*/opencv4/opencv2/.*;bits/.*;asm/.*;asm-generic/.*;sys/poll\.h'
   # RCLCPP_* logging macros expand to branches and would inflate the score.
   readability-function-cognitive-complexity.IgnoreMacros: true
   # A struct whose members are all public is plain data (public members have no suffix).

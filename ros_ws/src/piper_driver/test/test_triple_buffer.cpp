@@ -26,7 +26,7 @@ TEST(TripleBuffer, ConcurrentReadsAreWholeAndNeverGoBack)
     using Value = std::array<std::uint64_t, 16>;
     TripleBuffer<Value> buffer;
     constexpr std::uint64_t kWrites = 200'000;
-    std::jthread writer([&buffer] {
+    const std::jthread writer([&buffer] {
         for (std::uint64_t i = 1; i <= kWrites; ++i)
         {
             Value v;
@@ -38,7 +38,7 @@ TEST(TripleBuffer, ConcurrentReadsAreWholeAndNeverGoBack)
     while (last < kWrites)
     {
         const Value & v = buffer.read();
-        for (std::uint64_t field : v)
+        for (const std::uint64_t field : v)
         {
             ASSERT_EQ(field, v[0]);
         }

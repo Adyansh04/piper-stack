@@ -5,6 +5,8 @@
 #include <atomic>
 #include <chrono>
 #include <csignal>
+#include <cstdio>
+#include <exception>
 #include <print>
 #include <string>
 #include <thread>
@@ -13,10 +15,12 @@
 
 namespace
 {
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables): set by the signal handler
 std::atomic<bool> g_stop{false};
 }  // namespace
 
 int main(int argc, char ** argv)
+try
 {
     piper_driver::FakeArm::Options options;
     if (argc > 1)
@@ -37,4 +41,9 @@ int main(int argc, char ** argv)
         std::this_thread::sleep_for(std::chrono::milliseconds{100});
     }
     return 0;
+}
+catch (const std::exception & e)
+{
+    std::fputs(e.what(), stderr);
+    return 1;
 }

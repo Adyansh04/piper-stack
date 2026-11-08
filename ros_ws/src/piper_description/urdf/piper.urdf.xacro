@@ -1,16 +1,22 @@
 <?xml version="1.0"?>
 <!-- The Piper with its gripper and its ros2_control system, fixed to the world frame.
-     Arguments: prefix (link and joint names), hardware (mock|can), can_interface,
-     enable_on_activate (true|false), speed_percent. -->
+     Arguments: prefix (link and joint names), hardware (mock|can|isaac), can_interface,
+     enable_on_activate (true|false), speed_percent, wrist_camera (true|false),
+     motion_mode (joint|cpv|mit), collision_level (-1|0-8), end_load (|empty|half|full). -->
 <robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="piper">
   <xacro:arg name="prefix" default=""/>
   <xacro:arg name="hardware" default="mock"/>
-  <xacro:arg name="can_interface" default="can0"/>
+  <xacro:arg name="can_interface" default="can_follower"/>
   <xacro:arg name="enable_on_activate" default="false"/>
   <xacro:arg name="speed_percent" default="10"/>
+  <xacro:arg name="wrist_camera" default="true"/>
+  <xacro:arg name="motion_mode" default="joint"/>
+  <xacro:arg name="collision_level" default="-1"/>
+  <xacro:arg name="end_load" default=""/>
 
   <xacro:include filename="$(find piper_description)/urdf/piper_arm.xacro"/>
   <xacro:include filename="$(find piper_description)/urdf/piper.ros2_control.xacro"/>
+  <xacro:include filename="$(find piper_description)/urdf/piper_wrist_camera.xacro"/>
 
   <link name="world"/>
   <joint name="$(arg prefix)world_joint" type="fixed">
@@ -19,8 +25,15 @@
   </joint>
 
   <xacro:piper_arm prefix="$(arg prefix)"/>
+  <xacro:if value="$(arg wrist_camera)">
+    <xacro:piper_wrist_camera prefix="$(arg prefix)" parent="$(arg prefix)gripper_base"
+                              name="wrist_camera"/>
+  </xacro:if>
   <xacro:piper_ros2_control prefix="$(arg prefix)" hardware="$(arg hardware)"
                             can_interface="$(arg can_interface)"
                             enable_on_activate="$(arg enable_on_activate)"
-                            speed_percent="$(arg speed_percent)"/>
+                            speed_percent="$(arg speed_percent)"
+                            motion_mode="$(arg motion_mode)"
+                            collision_level="$(arg collision_level)"
+                            end_load="$(arg end_load)"/>
 </robot>

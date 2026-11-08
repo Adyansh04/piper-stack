@@ -1,0 +1,59 @@
+<root BTCPP_format="4">
+    <TreeNodesModel>
+        <Action ID="FindObjects">
+            <input_port name="timeout_s" type="double" default="0.000000">How long the goal may run before it is cancelled, seconds; 0: the executor's goal_timeout_s.</input_port>
+            <input_port name="server_timeout_s" type="double" default="0.000000">How long to wait for the action server, seconds; 0: the executor's server_timeout_s.</input_port>
+            <output_port name="nothing_in_view" type="bool">Set true on a failure when the views the arm reaches were looked at to the end and show none; left alone otherwise.</output_port>
+            <output_port name="count" type="unsigned int">How many were found.</output_port>
+            <output_port name="view" type="std::string">The view that found them.</output_port>
+            <input_port name="min_score" type="double" default="0.000000">Instances scoring below this are ignored (0: the default).</input_port>
+            <output_port name="object_pose" type="geometry_msgs::msg::PoseStamped_&lt;std::allocator&lt;void&gt; &gt;">Pose of the best match, in the planning frame.</output_port>
+            <input_port name="views" type="std::vector&lt;std::__cxx11::basic_string&lt;char, std::char_traits&lt;char&gt;, std::allocator&lt;char&gt; &gt;, std::allocator&lt;std::__cxx11::basic_string&lt;char, std::char_traits&lt;char&gt;, std::allocator&lt;char&gt; &gt; &gt; &gt;" default="">Views to try in order, 'full;middle'; empty: the node's default.</input_port>
+            <input_port name="prompt" type="std::string">What to look for, e.g. 'red cube'.</input_port>
+        </Action>
+        <Action ID="MoveArmToNamedPose">
+            <input_port name="timeout_s" type="double" default="0.000000">How long the goal may run before it is cancelled, seconds; 0: the executor's goal_timeout_s.</input_port>
+            <input_port name="server_timeout_s" type="double" default="0.000000">How long to wait for the action server, seconds; 0: the executor's server_timeout_s.</input_port>
+            <input_port name="velocity_scale" type="double" default="0.000000">Share of the joints' top speed, 0 to 1 (0: the default).</input_port>
+            <input_port name="pose" type="std::string" default="ready">The SRDF state: ready, rest, view_left or view_right.</input_port>
+        </Action>
+        <Action ID="PickObject">
+            <input_port name="timeout_s" type="double" default="0.000000">How long the goal may run before it is cancelled, seconds; 0: the executor's goal_timeout_s.</input_port>
+            <input_port name="server_timeout_s" type="double" default="0.000000">How long to wait for the action server, seconds; 0: the executor's server_timeout_s.</input_port>
+            <output_port name="finger_width_m" type="double">Finger opening on the held object, metres.</output_port>
+            <input_port name="approach" type="std::string" default="auto">Which grasps: top, side (from the side or diagonally), or auto (top first, side when no top grasp is reachable).</input_port>
+            <input_port name="min_score" type="double" default="0.000000">Instances scoring below this are ignored (0: the default).</input_port>
+            <input_port name="prompt" type="std::string">What to pick, e.g. 'red cube'.</input_port>
+        </Action>
+        <Action ID="PlaceObject">
+            <input_port name="timeout_s" type="double" default="0.000000">How long the goal may run before it is cancelled, seconds; 0: the executor's goal_timeout_s.</input_port>
+            <output_port name="place_pose" type="geometry_msgs::msg::PoseStamped_&lt;std::allocator&lt;void&gt; &gt;">Where the object went, in the planning frame.</output_port>
+            <input_port name="yaw_tolerance_deg" type="double" default="0.000000">How far the heading may be off, degrees.</input_port>
+            <input_port name="yaw_deg" type="std::string" default="any">The object's long axis from the table's x axis (away from the robot), degrees; any: any heading.</input_port>
+            <input_port name="anchor" type="std::string" default="none">Anchor mode: what to find on the table, e.g. 'red cube'.</input_port>
+            <input_port name="y" type="double" default="0.000000">Away from the robot: -1 to 1 or metres.</input_port>
+            <input_port name="anchor_pose" type="geometry_msgs::msg::PoseStamped_&lt;std::allocator&lt;void&gt; &gt;" default="none">Anchor mode: where the anchor is, in the planning frame (e.g. an earlier place_pose); none: the best match on the table.</input_port>
+            <input_port name="x" type="double" default="0.000000">To the robot's right: -1 to 1 or metres.</input_port>
+            <input_port name="mode" type="std::string" default="free">free (the free spot nearest the robot in the region), relative (x and y from -1 to 1 across the work area), metric (metres from its centre) or anchor (metres from the anchor).</input_port>
+            <input_port name="server_timeout_s" type="double" default="0.000000">How long to wait for the action server, seconds; 0: the executor's server_timeout_s.</input_port>
+            <input_port name="tolerance_m" type="double" default="0.000000">How far from the target the object may go when it is taken, metres.</input_port>
+            <input_port name="region" type="std::string" default="any">Free mode: any, left, middle or right (thirds of the work area as the robot sees it).</input_port>
+        </Action>
+        <Action ID="PlaceTarget">
+            <input_port name="server_timeout_s" type="double" default="0.000000">How long to wait for the service, seconds; 0: the executor's server_timeout_s.</input_port>
+            <input_port name="response_timeout_s" type="double" default="0.000000">How long to wait for the response, seconds; 0: the executor's response_timeout_s.</input_port>
+            <output_port name="reachable" type="bool">Whether the arm reaches above the target.</output_port>
+            <output_port name="target" type="geometry_msgs::msg::PoseStamped_&lt;std::allocator&lt;void&gt; &gt;">Where the placed object's centre goes, in the planning frame.</output_port>
+            <input_port name="y" type="double" default="0.000000">As for PlaceObject.</input_port>
+            <input_port name="anchor_pose" type="geometry_msgs::msg::PoseStamped_&lt;std::allocator&lt;void&gt; &gt;" default="none">Anchor mode: where the anchor is, in the planning frame; none: no anchor.</input_port>
+            <input_port name="x" type="double" default="0.000000">As for PlaceObject.</input_port>
+            <input_port name="mode" type="std::string" default="free">As for PlaceObject: free, relative, metric or anchor.</input_port>
+        </Action>
+        <Action ID="ViewWorkspace">
+            <input_port name="timeout_s" type="double" default="0.000000">How long the goal may run before it is cancelled, seconds; 0: the executor's goal_timeout_s.</input_port>
+            <input_port name="server_timeout_s" type="double" default="0.000000">How long to wait for the action server, seconds; 0: the executor's server_timeout_s.</input_port>
+            <input_port name="view" type="std::string" default="full">full, left, middle or right.</input_port>
+        </Action>
+    </TreeNodesModel>
+</root>
+

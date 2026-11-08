@@ -1,0 +1,13 @@
+state_estimator:
+  ros__parameters:
+    # The wrench is estimated at tip_link and expressed in base_link.
+    base_link: "base_link"
+    tip_link: "tcp"
+    joint_names: ["joint1", "joint2", "joint3", "joint4", "joint5", "joint6"]
+    gripper_joint: "joint7"
+    # Grip torque, N m, above which the fingers press on something (the closed, empty gripper
+    # reads about 0.1); the opening, m, below which it counts as closed on nothing; and how many
+    # consecutive joint states (at 200 Hz) the two must hold.
+    grasp_effort_threshold_nm: 0.3
+    grasp_min_opening_m: 0.004
+    grasp_samples: 20

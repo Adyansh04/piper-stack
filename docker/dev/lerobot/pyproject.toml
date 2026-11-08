@@ -1,0 +1,25 @@
+# The Python 3.12 environment of LeRobot and piper_lerobot's plugins, installed at /opt/lerobot-venv
+# by the Dockerfile from this file and its lock. LeRobot (Hugging Face, Apache 2.0) pins numpy below
+# 2.3, which has no wheels for Lyrical's Python 3.14, so it talks to the stack over ZMQ through
+# piper_lerobot's bridge node instead of rclpy.
+[project]
+name = "piper-lerobot"
+version = "0.1.0"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "lerobot[core-scripts,training]==0.7.0",
+    "pytest==9.0.2",
+    "pyzmq==27.2.0",
+]
+
+[tool.uv]
+package = false
+
+[tool.uv.sources]
+torch = { index = "pytorch-cu128" }
+torchvision = { index = "pytorch-cu128" }
+
+[[tool.uv.index]]
+name = "pytorch-cu128"
+url = "https://download.pytorch.org/whl/cu128"
+explicit = true

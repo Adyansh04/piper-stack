@@ -1,0 +1,28 @@
+# The Python 3.12 environment of the GraspGenX server (piper_perception/graspgenx), installed at
+# /opt/graspgenx-venv by the Dockerfile from this file and its lock. GraspGenX (NVlabs, Apache 2.0)
+# needs Python < 3.13 for its torch, so it cannot run on Lyrical's Python 3.14.
+[project]
+name = "piper-graspgenx"
+version = "0.1.0"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "graspgenx",
+    "pyzmq==27.2.0",
+    "pyyaml==6.0.3",
+]
+
+[tool.uv]
+package = false
+# GraspGenX caps torch below 2.7 for its authors' driver; 2.7 is the first with kernels for
+# Blackwell GPUs (sm_120, the RTX 5090), and upstream ran it on 2.7 (NGC pytorch 25.03).
+override-dependencies = ["torch==2.7.1", "torchvision==0.22.1"]
+
+[tool.uv.sources]
+graspgenx = { git = "https://github.com/NVlabs/GraspGenX", rev = "b9429097728cb1c430dd78b92edf17ba318aad03" }
+torch = { index = "pytorch-cu128" }
+torchvision = { index = "pytorch-cu128" }
+
+[[tool.uv.index]]
+name = "pytorch-cu128"
+url = "https://download.pytorch.org/whl/cu128"
+explicit = true

@@ -48,7 +48,8 @@ public:
    * @return Nothing, or the error (`no_buffer_space` or `resource_unavailable_try_again` when the
    *         transmit queue is full).
    */
-    [[nodiscard]] std::expected<void, std::error_code> send(const protocol::Frame & frame) noexcept;
+    [[nodiscard]] std::expected<void, std::error_code> send(
+        const protocol::Frame & frame) const noexcept;
 
     /**
    * @brief Waits for the next frame.

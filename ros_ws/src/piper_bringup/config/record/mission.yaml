@@ -1,0 +1,38 @@
+# Recording profile `mission` (record.launch.py): the arm profile's topics, plus what a behaviour
+# tree run does: the executor's status, the skills' goals, feedback and results, the camera's
+# timing (camera_info, without the images) and, in the simulator, the objects' ground truth.
+/**/recorder:
+  ros__parameters:
+    record:
+      topics:
+        - /joint_states
+        - /arm_controller/controller_state
+        - /arm_controller/joint_trajectory
+        - /controller_manager/statistics/names
+        - /controller_manager/statistics/values
+        - /diagnostics
+        - /robot_description
+        - /tf
+        - /tf_static
+        - /state_estimator/tcp_wrench
+        - /state_estimator/grasped
+        - /isaac_joint_commands
+        - /isaac_joint_states
+        - /clock
+        - /bt_executor/status
+        - /wrist_camera/color/camera_info
+        - /wrist_camera/depth/camera_info
+        - /sim/objects
+      actions:
+        - /gripper_controller/gripper_cmd
+        - /run_tree
+        - /move_arm_to_named_pose
+        - /view_workspace
+        - /find_objects
+        - /pick_object
+        - /place_object
+      # Latched topics whose last message goes into every file of a split bag.
+      repeat_transient_local: [/robot_description, /tf_static, /bt_executor/status]
+    storage:
+      storage_id: "mcap"
+      storage_preset_profile: "zstd_fast"

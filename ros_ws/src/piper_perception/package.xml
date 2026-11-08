@@ -1,0 +1,40 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>piper_perception</name>
+  <version>0.1.0</version>
+  <description>Open-vocabulary instance segmentation (SAM 3.1, C++ with TensorRT, the segment_objects service) and parallel-gripper grasps (GraspGenX, the compute_grasps service).</description>
+  <maintainer email="gupta.adyansh@gmail.com">Adyansh Gupta</maintainer>
+  <license>BSD-3-Clause</license>
+  <!-- The SAM 3 graphs' licence; the tokenizer vocabulary is OpenAI CLIP's (resources/CLIP_LICENSE). -->
+  <license file="resources/SAM_LICENSE">SAM License</license>
+  <license file="resources/CLIP_LICENSE">MIT</license>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+  <buildtool_depend>piper_cmake</buildtool_depend>
+
+  <!-- CUDA (CUDAToolkit) and TensorRT (libnvinfer, libnvonnxparser) come from NVIDIA's apt
+       repository in the Dockerfile; rosdep has no key for them. Without them only the CPU parts
+       build. -->
+  <depend>ament_index_cpp</depend>
+  <depend>cv_bridge</depend>
+  <depend>piper_msgs</depend>
+  <depend>libopencv-dev</depend>
+  <depend>rcl_interfaces</depend>
+  <depend>rclcpp</depend>
+  <depend>rclcpp_components</depend>
+  <depend>sensor_msgs</depend>
+  <depend>zlib</depend>
+  <!-- cppzmq's header (cppzmq-dev) comes from the Dockerfile with libzmq. -->
+  <depend>libzmq3-dev</depend>
+
+  <exec_depend>launch</exec_depend>
+  <exec_depend>launch_ros</exec_depend>
+
+  <test_depend>ament_cmake_gtest</test_depend>
+  <test_depend>ament_cmake_pytest</test_depend>
+
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>

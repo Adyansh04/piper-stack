@@ -1,0 +1,11 @@
+# ruff for the stack's Python: launch files, the Isaac Sim scene and Isaac Lab tasks, the model
+# servers (./scripts/manage.sh lint). Lines as long as clang-format's.
+line-length = 100
+target-version = "py312"
+extend-exclude = ["ros_ws/src/vendor", "docs/notes"]
+
+[format]
+quote-style = "single"
+
+[lint]
+select = ["E", "F", "W", "I", "B", "UP", "C4"]

@@ -3,15 +3,27 @@
 #include <linux/can.h>
 #include <linux/can/error.h>
 #include <linux/can/raw.h>
+#include <linux/sockios.h>
 #include <net/if.h>
 #include <poll.h>
 #include <sys/ioctl.h>
 #include <sys/socket.h>
+#include <sys/types.h>
 #include <unistd.h>
 
+#include <array>
 #include <cerrno>
+#include <chrono>
+#include <cstdint>
 #include <cstring>
+#include <ctime>
+#include <expected>
+#include <iterator>
+#include <string>
+#include <system_error>
 #include <utility>
+
+#include "piper_driver/protocol.hpp"
 
 namespace piper_driver
 {
@@ -37,7 +49,8 @@ std::expected<CanBus, std::error_code> CanBus::open(const std::string & interfac
     }
     CanBus bus(fd);
     ifreq ifr{};
-    std::memcpy(ifr.ifr_name, interface.c_str(), interface.size() + 1);
+    std::memcpy(std::data(ifr.ifr_name), interface.c_str(), interface.size() + 1);
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-vararg): the index is only reachable through ioctl
     if (::ioctl(fd, SIOCGIFINDEX, &ifr) < 0)
     {
         return std::unexpected(lastError());
@@ -53,6 +66,7 @@ std::expected<CanBus, std::error_code> CanBus::open(const std::string & interfac
     sockaddr_can addr{};
     addr.can_family = AF_CAN;
     addr.can_ifindex = ifr.ifr_ifindex;
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast): bind() takes the generic type
     if (::bind(fd, reinterpret_cast<sockaddr *>(&addr), sizeof(addr)) < 0)
     {
         return std::unexpected(lastError());
@@ -83,12 +97,12 @@ CanBus::~CanBus()
     }
 }
 
-std::expected<void, std::error_code> CanBus::send(const protocol::Frame & frame) noexcept
+std::expected<void, std::error_code> CanBus::send(const protocol::Frame & frame) const noexcept
 {
     can_frame raw{};
     raw.can_id = frame.id & CAN_SFF_MASK;
-    raw.len = frame.length;
-    std::memcpy(raw.data, frame.data.data(), sizeof(raw.data));
+    raw.len = frame.length;  // NOLINT(cppcoreguidelines-pro-type-union-access): kernel ABI
+    std::memcpy(std::data(raw.data), frame.data.data(), sizeof(raw.data));
     if (::write(fd_, &raw, sizeof(raw)) != static_cast<ssize_t>(sizeof(raw)))
     {
         return std::unexpected(lastError());
@@ -111,12 +125,12 @@ std::expected<ReceivedFrame, std::error_code> CanBus::receive(
     }
     can_frame raw{};
     iovec iov{.iov_base = &raw, .iov_len = sizeof(raw)};
-    alignas(cmsghdr) char control[CMSG_SPACE(sizeof(timespec))];
+    alignas(cmsghdr) std::array<char, CMSG_SPACE(sizeof(timespec))> control{};
     msghdr msg{};
     msg.msg_iov = &iov;
     msg.msg_iovlen = 1;
-    msg.msg_control = control;
-    msg.msg_controllen = sizeof(control);
+    msg.msg_control = control.data();
+    msg.msg_controllen = control.size();
     if (::recvmsg(fd_, &msg, 0) != static_cast<ssize_t>(sizeof(raw)))
     {
         return std::unexpected(lastError());
@@ -133,8 +147,8 @@ std::expected<ReceivedFrame, std::error_code> CanBus::receive(
     }
     out.error = (raw.can_id & CAN_ERR_FLAG) != 0;
     out.frame.id = raw.can_id & CAN_SFF_MASK;
-    out.frame.length = raw.len;
-    std::memcpy(out.frame.data.data(), raw.data, sizeof(raw.data));
+    out.frame.length = raw.len;  // NOLINT(cppcoreguidelines-pro-type-union-access): kernel ABI
+    std::memcpy(out.frame.data.data(), std::data(raw.data), sizeof(raw.data));
     return out;
 }
 

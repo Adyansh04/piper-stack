@@ -1,0 +1,34 @@
+<?xml version="1.0"?>
+<!--
+  Puts the held object on the table: two tries, then back to ready. mode free puts it on the free
+  spot nearest the robot in region (any, left, middle, right); relative takes x and y from -1 to 1
+  across the work area; metric takes them in metres from its centre; anchor in metres from the
+  object named by anchor. x is to the robot's right, y away from it. A place that leaves the arm
+  stuck (arm_stuck) stops the retries and the way back.
+-->
+<root BTCPP_format="4">
+  <BehaviorTree ID="PlaceOnTable">
+    <Fallback name="place_or_back_off">
+      <RetryUntilSuccessful name="place_twice" num_attempts="2">
+        <PlaceObject name="place_it" _failureIf="@arm_stuck == true" mode="{mode}" region="{region}"
+                     x="{x}" y="{y}" tolerance_m="{tolerance_m}" anchor="{anchor}"
+                     place_pose="{place_pose}"/>
+      </RetryUntilSuccessful>
+      <ForceFailure name="then_fail">
+        <MoveArmToNamedPose name="back_to_ready" _failureIf="@arm_stuck == true" pose="ready"/>
+      </ForceFailure>
+    </Fallback>
+  </BehaviorTree>
+
+  <TreeNodesModel>
+    <SubTree ID="PlaceOnTable">
+      <input_port name="mode" default="free">free, relative, metric or anchor.</input_port>
+      <input_port name="region" default="any">free mode: any, left, middle or right.</input_port>
+      <input_port name="x" default="0.0">relative: -1 to 1; metric and anchor: metres.</input_port>
+      <input_port name="y" default="0.0">relative: -1 to 1; metric and anchor: metres.</input_port>
+      <input_port name="tolerance_m" default="0.05">How far a taken target may move, metres.</input_port>
+      <input_port name="anchor" default="none">anchor mode: the object to place next to.</input_port>
+      <output_port name="place_pose">Where the object went.</output_port>
+    </SubTree>
+  </TreeNodesModel>
+</root>

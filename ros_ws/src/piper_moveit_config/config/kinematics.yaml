@@ -1,0 +1,16 @@
+# Inverse kinematics: pick_ik, which handles the arm's 6 joints with their limits and returns
+# the solution nearest the current pose. Tolerances tight enough for Pilz, which solves IK along a
+# straight line and differentiates the solutions: millimetre noise there reads as acceleration.
+arm:
+  kinematics_solver: pick_ik/PickIkPlugin
+  kinematics_solver_timeout: 0.05
+  mode: global
+  stop_optimization_on_valid_solution: true
+  # In m and rad.
+  position_threshold: 0.00001
+  orientation_threshold: 0.0001
+  cost_threshold: 0.0000001
+  position_scale: 1.0
+  rotation_scale: 0.5
+  minimal_displacement_weight: 0.0
+  gd_step_size: 0.0001

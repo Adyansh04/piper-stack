@@ -1,0 +1,7 @@
+# Servo's IK, solved every 10 ms step from the current pose: KDL's Newton-Raphson converges on a
+# 0.3 mm step within its tolerance at once, where the planners' pick_ik (global search, 1 mm
+# tolerance) would treat the step as already reached.
+arm:
+  kinematics_solver: kdl_kinematics_plugin/KDLKinematicsPlugin
+  kinematics_solver_timeout: 0.005
+  kinematics_solver_search_resolution: 0.005

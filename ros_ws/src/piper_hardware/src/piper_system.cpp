@@ -1,13 +1,24 @@
 #include "piper_hardware/piper_system.hpp"
 
 #include <algorithm>
+#include <array>
 #include <chrono>
 #include <cmath>
+#include <cstddef>
+#include <cstdint>
+#include <exception>
+#include <format>
 #include <limits>
+#include <stdexcept>
 #include <string>
+#include <string_view>
 #include <thread>
+#include <tuple>
+#include <utility>
 
 #include "hardware_interface/types/hardware_interface_type_values.hpp"
+#include "piper_driver/arm.hpp"
+#include "piper_driver/protocol.hpp"
 #include "pluginlib/class_list_macros.hpp"
 #include "rclcpp/logging.hpp"
 
@@ -32,6 +43,43 @@ std::int64_t steadyNs()
     return std::chrono::duration_cast<std::chrono::nanoseconds>(
                std::chrono::steady_clock::now().time_since_epoch())
         .count();
+}
+
+// hardware_interface declares the interface types as char arrays; views of them compare and
+// format without decaying.
+constexpr std::string_view kPosition{std::data(hardware_interface::HW_IF_POSITION)};
+constexpr std::string_view kVelocity{std::data(hardware_interface::HW_IF_VELOCITY)};
+constexpr std::string_view kEffort{std::data(hardware_interface::HW_IF_EFFORT)};
+
+std::string interfaceName(const std::string & joint, std::string_view type)
+{
+    return std::format("{}/{}", joint, type);
+}
+
+std::string motionModeName(std::uint8_t mode)
+{
+    switch (mode)
+    {
+        case 1:
+            return "MOVE CPV";
+        case 2:
+            return "MIT";
+        default:
+            return "MOVE J";
+    }
+}
+
+protocol::EndLoad parseEndLoad(const std::string & load)
+{
+    if (load == "full")
+    {
+        return protocol::EndLoad::kFull;
+    }
+    if (load == "half")
+    {
+        return protocol::EndLoad::kHalf;
+    }
+    return protocol::EndLoad::kEmpty;
 }
 
 bool isTrue(const std::string & value)
@@ -74,11 +122,18 @@ CallbackReturn PiperSystem::on_init(
     for (std::size_t i = 0; i < joints_.size(); ++i)
     {
         const auto & joint = info_.joints[i];
-        if (joint.command_interfaces.size() != 1
-            || joint.command_interfaces[0].name != hardware_interface::HW_IF_POSITION)
+        const auto & commands = joint.command_interfaces;
+        // Position first; arm joints may add velocity and effort, used in MIT mode only.
+        const bool extra_ok = std::ranges::all_of(
+            commands.begin() + (commands.empty() ? 0 : 1), commands.end(), [&](const auto & c) {
+                return i < kArmJoints && (c.name == kVelocity || c.name == kEffort);
+            });
+        if (commands.empty() || commands[0].name != kPosition || !extra_ok)
         {
             RCLCPP_FATAL(
-                get_logger(), "%s: one position command interface expected", joint.name.c_str());
+                get_logger(),
+                "%s: a position command interface first, then optional velocity and effort",
+                joint.name.c_str());
             return CallbackReturn::ERROR;
         }
         try
@@ -102,6 +157,31 @@ CallbackReturn PiperSystem::on_init(
         speed_percent_ = std::stoi(p.at("speed_percent"));
         feedback_timeout_ns_ = std::stoll(p.at("feedback_timeout_ms")) * 1'000'000;
         gripper_effort_nm_ = std::stod(p.at("gripper_effort_nm"));
+        // Optional: defaults keep a description without them on MOVE J.
+        const auto optional = [&p](const char * key, const char * fallback) {
+            const auto it = p.find(key);
+            return it == p.end() ? std::string{fallback} : it->second;
+        };
+        const std::string mode = optional("motion_mode", "joint");
+        if (mode != "joint" && mode != "cpv" && mode != "mit")
+        {
+            throw std::invalid_argument("motion_mode must be joint, cpv or mit, not " + mode);
+        }
+        motion_mode_ = MotionMode::kJoint;
+        if (mode == "cpv")
+        {
+            motion_mode_ = MotionMode::kCpv;
+        }
+        else if (mode == "mit")
+        {
+            motion_mode_ = MotionMode::kMit;
+        }
+        mit_kp_ = std::stod(optional("mit_kp", "10.0"));
+        mit_kd_ = std::stod(optional("mit_kd", "0.8"));
+        mit_max_torque_nm_ = std::stod(optional("mit_max_torque_nm", "2.0"));
+        mit_max_velocity_rad_s_ = std::stod(optional("mit_max_velocity_rad_s", "3.0"));
+        collision_level_ = std::stoi(optional("collision_level", "-1"));
+        end_load_ = optional("end_load", "");
     }
     catch (const std::exception & e)
     {
@@ -115,6 +195,20 @@ CallbackReturn PiperSystem::on_init(
             get_logger(),
             "speed_percent must be 1-100, feedback_timeout_ms positive, "
             "gripper_effort_nm 0-5");
+        return CallbackReturn::ERROR;
+    }
+    if (mit_kp_ < 0.0 || mit_kp_ > protocol::kMitKpMax || mit_kd_ < 0.0
+        || mit_kd_ > protocol::kMitKdRange || mit_max_torque_nm_ < 0.0
+        || mit_max_torque_nm_ > protocol::kMitTorqueNm || mit_max_velocity_rad_s_ <= 0.0
+        || mit_max_velocity_rad_s_ > protocol::kMitVelocityRadS || collision_level_ < -1
+        || std::cmp_greater(collision_level_, protocol::kMaxCollisionLevel)
+        || (!end_load_.empty() && end_load_ != "empty" && end_load_ != "half"
+            && end_load_ != "full"))
+    {
+        RCLCPP_FATAL(
+            get_logger(),
+            "mit_kp must be 0-500, mit_kd 0-5, mit_max_torque_nm 0-8, mit_max_velocity_rad_s "
+            "0-45, collision_level -1-8, end_load empty, half or full");
         return CallbackReturn::ERROR;
     }
     return CallbackReturn::SUCCESS;
@@ -146,14 +240,23 @@ CallbackReturn PiperSystem::on_configure(const rclcpp_lifecycle::State & /*previ
     for (std::size_t i = 0; i < joints_.size(); ++i)
     {
         const std::string & name = info_.joints[i].name;
-        joints_[i].position =
-            get_state_interface_handle(name + "/" + hardware_interface::HW_IF_POSITION);
-        joints_[i].velocity =
-            get_state_interface_handle(name + "/" + hardware_interface::HW_IF_VELOCITY);
-        joints_[i].effort =
-            get_state_interface_handle(name + "/" + hardware_interface::HW_IF_EFFORT);
-        joints_[i].command =
-            get_command_interface_handle(name + "/" + hardware_interface::HW_IF_POSITION);
+        joints_[i].position = get_state_interface_handle(interfaceName(name, kPosition));
+        joints_[i].velocity = get_state_interface_handle(interfaceName(name, kVelocity));
+        joints_[i].effort = get_state_interface_handle(interfaceName(name, kEffort));
+        joints_[i].command = get_command_interface_handle(interfaceName(name, kPosition));
+        for (const auto & command : info_.joints[i].command_interfaces)
+        {
+            if (command.name == kVelocity)
+            {
+                joints_[i].velocity_command =
+                    get_command_interface_handle(interfaceName(name, kVelocity));
+            }
+            else if (command.name == kEffort)
+            {
+                joints_[i].effort_command =
+                    get_command_interface_handle(interfaceName(name, kEffort));
+            }
+        }
     }
     const auto & state = arm_->latest();
     seen_foreign_ = state.foreign_commands;
@@ -170,7 +273,7 @@ CallbackReturn PiperSystem::on_configure(const rclcpp_lifecycle::State & /*previ
 CallbackReturn PiperSystem::on_activate(const rclcpp_lifecycle::State & /*previous_state*/)
 {
     const auto & state = arm_->latest();
-    std::copy(state.position_rad.begin(), state.position_rad.end(), target_rad_.begin());
+    std::ranges::copy(state.position_rad, target_rad_.begin());
     gripper_target_m_ = state.gripper.stroke_m / 2.0;
     // Controllers start from the measured pose, and the limits stretch to include it: the arm rests
     // slightly outside its firmware limits, and enabling must not move it.
@@ -194,9 +297,10 @@ CallbackReturn PiperSystem::on_activate(const rclcpp_lifecycle::State & /*previo
             get_logger(), "not enabling: the arm reports status 0x%02X", state.status.arm_status);
         return CallbackReturn::ERROR;
     }
-    // Mode and a hold target first, so the motors come on holding the measured pose.
-    if (!arm_->setMode(protocol::CtrlMode::kCan, protocol::MoveMode::kJ, speed_percent_)
-        || !arm_->commandJoints(target_rad_) || !arm_->enable(true))
+    target_velocity_rad_s_.fill(0.0);
+    target_effort_nm_.fill(0.0);
+    // Settings, then the mode and a hold target, so the motors come on holding the measured pose.
+    if (!applySettings() || !sendMode() || !sendTargets() || !arm_->enable(true))
     {
         RCLCPP_ERROR(
             get_logger(), "sending the enable sequence on %s failed", can_interface_.c_str());
@@ -217,11 +321,12 @@ CallbackReturn PiperSystem::on_activate(const rclcpp_lifecycle::State & /*previo
             seen_foreign_ = s.foreign_commands;
             RCLCPP_INFO(
                 get_logger(),
-                "motors enabled, holding the measured pose, MOVE J at %d%%",
+                "motors enabled, holding the measured pose (%s, speed %d%%)",
+                motionModeName(static_cast<std::uint8_t>(motion_mode_)).c_str(),
                 speed_percent_);
             return CallbackReturn::SUCCESS;
         }
-        std::ignore = arm_->commandJoints(target_rad_);
+        std::ignore = sendTargets();
         std::this_thread::sleep_for(std::chrono::milliseconds{20});
     }
     // Some motors may be on: hold the pose rather than disable and drop the arm.
@@ -323,13 +428,27 @@ return_type PiperSystem::write(const rclcpp::Time & /*time*/, const rclcpp::Dura
         {
             target_rad_[i] = std::clamp(command, joints_[i].lower, joints_[i].upper);
         }
+        if (motion_mode_ == MotionMode::kMit)
+        {
+            double velocity = 0.0;
+            double effort = 0.0;
+            target_velocity_rad_s_[i] =
+                joints_[i].velocity_command
+                        && get_command(joints_[i].velocity_command, velocity, false)
+                        && std::isfinite(velocity)
+                    ? std::clamp(velocity, -mit_max_velocity_rad_s_, mit_max_velocity_rad_s_)
+                    : 0.0;
+            target_effort_nm_[i] = joints_[i].effort_command
+                                           && get_command(joints_[i].effort_command, effort, false)
+                                           && std::isfinite(effort)
+                                       ? std::clamp(effort, -mit_max_torque_nm_, mit_max_torque_nm_)
+                                       : 0.0;
+        }
     }
-    bool sent = arm_->commandJoints(target_rad_).has_value();
+    bool sent = sendTargets();
     if (++cycle_ % kModeEveryCycles == 0)
     {
-        sent = arm_->setMode(protocol::CtrlMode::kCan, protocol::MoveMode::kJ, speed_percent_)
-                   .has_value()
-               && sent;
+        sent = sendMode() && sent;
     }
     double gripper = std::numeric_limits<double>::quiet_NaN();
     if (get_command(joints_[kGripper].command, gripper, false) && std::isfinite(gripper))
@@ -372,8 +491,63 @@ bool PiperSystem::waitForFeedback(std::uint64_t frames, double timeout_s)
 void PiperSystem::holdMeasuredPose()
 {
     const auto & s = arm_->latest();
-    std::copy(s.position_rad.begin(), s.position_rad.end(), target_rad_.begin());
-    std::ignore = arm_->commandJoints(target_rad_);
+    std::ranges::copy(s.position_rad, target_rad_.begin());
+    target_velocity_rad_s_.fill(0.0);
+    target_effort_nm_.fill(0.0);
+    std::ignore = sendTargets();
+}
+
+bool PiperSystem::sendMode()
+{
+    switch (motion_mode_)
+    {
+        case MotionMode::kJoint:
+            return arm_->setMode(protocol::CtrlMode::kCan, protocol::MoveMode::kJ, speed_percent_)
+                .has_value();
+        case MotionMode::kCpv:
+            return arm_->setMode(protocol::CtrlMode::kCan, protocol::MoveMode::kCpv, speed_percent_)
+                .has_value();
+        case MotionMode::kMit:
+            // As piper_sdk's MIT demo: MOVE M with the MIT flag and no speed scaling.
+            return arm_->setMode(protocol::CtrlMode::kCan, protocol::MoveMode::kMit, 0, true)
+                .has_value();
+    }
+    return false;
+}
+
+bool PiperSystem::sendTargets()
+{
+    if (motion_mode_ != MotionMode::kMit)
+    {
+        return arm_->commandJoints(target_rad_).has_value();
+    }
+    std::array<protocol::MitCommand, kArmJoints> commands{};
+    for (std::size_t i = 0; i < kArmJoints; ++i)
+    {
+        commands.at(i) = {
+            .position_rad = target_rad_.at(i),
+            .velocity_rad_s = target_velocity_rad_s_.at(i),
+            .kp = mit_kp_,
+            .kd = mit_kd_,
+            .torque_nm = target_effort_nm_.at(i)};
+    }
+    return arm_->commandMit(commands).has_value();
+}
+
+bool PiperSystem::applySettings()
+{
+    bool sent = true;
+    if (collision_level_ >= 0)
+    {
+        std::array<std::uint8_t, kArmJoints> levels{};
+        levels.fill(static_cast<std::uint8_t>(collision_level_));
+        sent = arm_->setCollisionLevels(levels).has_value();
+    }
+    if (!end_load_.empty())
+    {
+        sent = arm_->setEndLoad(parseEndLoad(end_load_)).has_value() && sent;
+    }
+    return sent;
 }
 
 }  // namespace piper_hardware

@@ -1,0 +1,32 @@
+<?xml version="1.0"?>
+<!--
+  Picks an object off the table: up to three tries, looking again after a failed one, and back to
+  ready when all fail. A skill that leaves the arm stuck (arm_stuck: the fingers would not open or
+  let go) stops every move after it, the retries and the way back included.
+-->
+<root BTCPP_format="4">
+  <BehaviorTree ID="PickFromTable">
+    <Fallback name="pick_or_back_off">
+      <RetryUntilSuccessful name="pick_three_times" num_attempts="3">
+        <Fallback name="pick_or_find_again">
+          <PickObject name="pick_it" _failureIf="@arm_stuck == true" prompt="{object}"
+                      approach="{approach}" finger_width_m="{finger_width_m}"/>
+          <ForceFailure name="then_pick_again">
+            <FindObjects name="find_it_again" _failureIf="@arm_stuck == true" prompt="{object}"/>
+          </ForceFailure>
+        </Fallback>
+      </RetryUntilSuccessful>
+      <ForceFailure name="then_fail">
+        <MoveArmToNamedPose name="back_to_ready" _failureIf="@arm_stuck == true" pose="ready"/>
+      </ForceFailure>
+    </Fallback>
+  </BehaviorTree>
+
+  <TreeNodesModel>
+    <SubTree ID="PickFromTable">
+      <input_port name="object">What to pick, as SAM 3.1 reads it: red cube, blue cube.</input_port>
+      <input_port name="approach" default="auto">top, side or auto (top first).</input_port>
+      <output_port name="finger_width_m">The fingers' opening on the object, metres.</output_port>
+    </SubTree>
+  </TreeNodesModel>
+</root>

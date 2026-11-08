@@ -1,0 +1,23 @@
+keyboard_jog:
+  ros__parameters:
+    # Speeds at x1 ([ and ] halve and double them): tool m/s and rad/s, joints rad/s.
+    linear_speed_mps: 0.05
+    angular_speed_radps: 0.3
+    joint_speed_radps: 0.3
+    # Commands per second while a key is held; Servo stops 0.2 s after the last one.
+    publish_rate_hz: 50.0
+    # How long one key press keeps the command going, bridging the terminal's key-repeat gaps, s.
+    key_hold_s: 0.15
+    base_frame: "base_link"
+    tool_frame: "tcp"
+    joint_names: ["joint1", "joint2", "joint3", "joint4", "joint5", "joint6"]
+    twist_topic: "/servo_node/delta_twist_cmds"
+    joint_jog_topic: "/servo_node/delta_joint_cmds"
+    command_type_service: "/servo_node/switch_command_type"
+    gripper_action: "/gripper_controller/gripper_cmd"
+    gripper_joint: "joint7"
+    # One finger's travel, m (fully open is 35 mm per finger).
+    gripper_open_m: 0.035
+    gripper_closed_m: 0.0
+    # Grip torque sent with each gripper goal, N m.
+    gripper_effort_nm: 1.0

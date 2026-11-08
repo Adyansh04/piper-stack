@@ -11,12 +11,19 @@
 
   <exec_depend>controller_manager</exec_depend>
   <exec_depend>joint_state_broadcaster</exec_depend>
+  <!-- hardware:=isaac: the simulator over its joint topics. -->
+  <exec_depend>joint_state_topic_hardware_interface</exec_depend>
   <exec_depend>joint_trajectory_controller</exec_depend>
   <exec_depend>parallel_gripper_controller</exec_depend>
   <exec_depend>percipio_camera</exec_depend>
+  <exec_depend>piper_controllers</exec_depend>
+  <exec_depend>piper_moveit_config</exec_depend>
   <exec_depend>piper_description</exec_depend>
   <exec_depend>piper_hardware</exec_depend>
   <exec_depend>robot_state_publisher</exec_depend>
+  <!-- record.launch.py: the recorder node and its MCAP storage. -->
+  <exec_depend>rosbag2_storage_mcap</exec_depend>
+  <exec_depend>rosbag2_transport</exec_depend>
   <exec_depend>rviz2</exec_depend>
   <exec_depend>xacro</exec_depend>
 

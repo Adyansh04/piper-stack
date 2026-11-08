@@ -16,7 +16,7 @@ Visualization Manager:
       Name: Coloured cloud
       Enabled: true
       Topic:
-        Value: /camera/depth_registered/points
+        Value: /wrist_camera/depth_registered/points
       Color Transformer: RGB8
       Style: Points
       Size (Pixels): 2
@@ -24,17 +24,17 @@ Visualization Manager:
       Name: Colour
       Enabled: true
       Topic:
-        Value: /camera/color/image_raw
+        Value: /wrist_camera/color/image_raw
     - Class: rviz_default_plugins/Image
       Name: Depth
       Enabled: true
       Topic:
-        Value: /camera/depth/image_raw
+        Value: /wrist_camera/depth/image_raw
       Normalize Range: false
       Min Value: 0
       Max Value: 2000
   Global Options:
-    Fixed Frame: camera_link
+    Fixed Frame: wrist_camera_link
     Frame Rate: 30
   Views:
     Current:

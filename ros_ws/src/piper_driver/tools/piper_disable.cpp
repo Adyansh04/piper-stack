@@ -2,12 +2,15 @@
 //
 //   piper_disable <interface> --yes
 
+#include <cstdio>
+#include <exception>
 #include <print>
 #include <string>
 
 #include "piper_driver/arm.hpp"
 
 int main(int argc, char ** argv)
+try
 {
     if (argc != 3 || std::string(argv[2]) != "--yes")
     {
@@ -28,4 +31,9 @@ int main(int argc, char ** argv)
     }
     std::println("disable sent on {}", argv[1]);
     return 0;
+}
+catch (const std::exception & e)
+{
+    std::fputs(e.what(), stderr);
+    return 1;
 }

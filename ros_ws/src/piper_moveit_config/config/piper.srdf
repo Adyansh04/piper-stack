@@ -1,0 +1,105 @@
+<?xml version="1.0"?>
+<!-- MoveIt's semantic description of the Piper: planning groups, named poses and the pairs of
+     links never checked for collision (computed with the Setup Assistant's sampling,
+     100000 random poses). -->
+<robot name="piper">
+  <group name="arm">
+    <chain base_link="base_link" tip_link="tcp"/>
+  </group>
+  <group name="gripper">
+    <joint name="joint7"/>
+    <joint name="joint8"/>
+  </group>
+
+  <!-- Folded on itself: where the arm rests with its motors off. -->
+  <group_state name="rest" group="arm">
+    <joint name="joint1" value="0"/>
+    <joint name="joint2" value="0"/>
+    <joint name="joint3" value="0"/>
+    <joint name="joint4" value="0"/>
+    <joint name="joint5" value="0"/>
+    <joint name="joint6" value="0"/>
+  </group_state>
+  <!-- tcp 0.30 m ahead and 0.20 m up; the wrist camera looks straight down from 0.31 m. -->
+  <group_state name="ready" group="arm">
+    <joint name="joint1" value="0"/>
+    <joint name="joint2" value="1.32"/>
+    <joint name="joint3" value="-1.14"/>
+    <joint name="joint4" value="0"/>
+    <joint name="joint5" value="1.1"/>
+    <joint name="joint6" value="0"/>
+  </group_state>
+  <!-- Views of the work area's thirds for the skills: ready turned 0.25 rad about joint 1, less than
+       towards a third's centre: a held object hides the table under the camera, and the third's
+       reachable part stays in view beside it. -->
+  <group_state name="view_left" group="arm">
+    <joint name="joint1" value="0.25"/>
+    <joint name="joint2" value="1.32"/>
+    <joint name="joint3" value="-1.14"/>
+    <joint name="joint4" value="0"/>
+    <joint name="joint5" value="1.1"/>
+    <joint name="joint6" value="0"/>
+  </group_state>
+  <group_state name="view_right" group="arm">
+    <joint name="joint1" value="-0.25"/>
+    <joint name="joint2" value="1.32"/>
+    <joint name="joint3" value="-1.14"/>
+    <joint name="joint4" value="0"/>
+    <joint name="joint5" value="1.1"/>
+    <joint name="joint6" value="0"/>
+  </group_state>
+  <group_state name="open" group="gripper">
+    <joint name="joint7" value="0.035"/>
+    <joint name="joint8" value="-0.035"/>
+  </group_state>
+  <group_state name="closed" group="gripper">
+    <joint name="joint7" value="0"/>
+    <joint name="joint8" value="0"/>
+  </group_state>
+
+  <end_effector name="gripper" parent_link="tcp" group="gripper" parent_group="arm"/>
+
+  <disable_collisions link1="base_link" link2="link1" reason="Adjacent"/>
+  <disable_collisions link1="base_link" link2="link2" reason="Never"/>
+  <disable_collisions link1="base_link" link2="link3" reason="Never"/>
+  <disable_collisions link1="camera_mount" link2="gripper_base" reason="Adjacent"/>
+  <disable_collisions link1="camera_mount" link2="link3" reason="Never"/>
+  <disable_collisions link1="camera_mount" link2="link4" reason="Never"/>
+  <disable_collisions link1="camera_mount" link2="link5" reason="Default"/>
+  <disable_collisions link1="camera_mount" link2="link6" reason="Never"/>
+  <disable_collisions link1="camera_mount" link2="link7" reason="Never"/>
+  <disable_collisions link1="camera_mount" link2="link8" reason="Never"/>
+  <disable_collisions link1="camera_mount" link2="wrist_camera_link" reason="Adjacent"/>
+  <disable_collisions link1="gripper_base" link2="link3" reason="Never"/>
+  <disable_collisions link1="gripper_base" link2="link4" reason="Never"/>
+  <disable_collisions link1="gripper_base" link2="link5" reason="Never"/>
+  <disable_collisions link1="gripper_base" link2="link6" reason="Adjacent"/>
+  <disable_collisions link1="gripper_base" link2="link7" reason="Adjacent"/>
+  <disable_collisions link1="gripper_base" link2="link8" reason="Adjacent"/>
+  <disable_collisions link1="gripper_base" link2="wrist_camera_link" reason="Never"/>
+  <disable_collisions link1="link1" link2="link2" reason="Adjacent"/>
+  <disable_collisions link1="link1" link2="link3" reason="Never"/>
+  <disable_collisions link1="link2" link2="link3" reason="Adjacent"/>
+  <disable_collisions link1="link2" link2="link4" reason="Never"/>
+  <disable_collisions link1="link3" link2="link4" reason="Adjacent"/>
+  <disable_collisions link1="link3" link2="link5" reason="Never"/>
+  <disable_collisions link1="link3" link2="link6" reason="Never"/>
+  <disable_collisions link1="link3" link2="link7" reason="Never"/>
+  <disable_collisions link1="link3" link2="link8" reason="Never"/>
+  <disable_collisions link1="link3" link2="wrist_camera_link" reason="Never"/>
+  <disable_collisions link1="link4" link2="link5" reason="Adjacent"/>
+  <disable_collisions link1="link4" link2="link6" reason="Never"/>
+  <disable_collisions link1="link4" link2="link7" reason="Never"/>
+  <disable_collisions link1="link4" link2="link8" reason="Never"/>
+  <disable_collisions link1="link4" link2="wrist_camera_link" reason="Never"/>
+  <disable_collisions link1="link5" link2="link6" reason="Adjacent"/>
+  <disable_collisions link1="link5" link2="link7" reason="Never"/>
+  <disable_collisions link1="link5" link2="link8" reason="Never"/>
+  <disable_collisions link1="link5" link2="wrist_camera_link" reason="Never"/>
+  <disable_collisions link1="link6" link2="link7" reason="Never"/>
+  <disable_collisions link1="link6" link2="link8" reason="Never"/>
+  <disable_collisions link1="link6" link2="wrist_camera_link" reason="Never"/>
+  <disable_collisions link1="link7" link2="link8" reason="Default"/>
+  <disable_collisions link1="link7" link2="wrist_camera_link" reason="Never"/>
+  <disable_collisions link1="link8" link2="wrist_camera_link" reason="Never"/>
+</robot>

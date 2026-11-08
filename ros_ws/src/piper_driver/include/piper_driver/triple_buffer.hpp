@@ -20,7 +20,8 @@ namespace piper_driver
  */
 template <typename T>
     requires std::is_trivially_copyable_v<T>
-class TripleBuffer
+// The padding keeps the writer's and the reader's indices on cache lines of their own.
+class TripleBuffer  // NOLINT(clang-analyzer-optin.performance.Padding)
 {
 public:
     /**

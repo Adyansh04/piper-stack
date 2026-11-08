@@ -1,0 +1,30 @@
+<?xml version="1.0"?>
+<!--
+  Sorts up to three objects into regions of the table, in order:
+
+    object_1=red cube  region_1=left  object_2=blue cube  region_2=right
+
+  An object left out (none) is skipped. A move that fails ends the sort.
+-->
+<root BTCPP_format="4">
+  <BehaviorTree ID="SortObjects">
+    <Sequence name="sort">
+      <SubTree ID="PickAndPlace" name="move_first" object="{object_1}" place_region="{region_1}"/>
+      <SubTree ID="PickAndPlace" name="move_second" _skipIf="object_2 == 'none'" object="{object_2}"
+               place_region="{region_2}"/>
+      <SubTree ID="PickAndPlace" name="move_third" _skipIf="object_3 == 'none'" object="{object_3}"
+               place_region="{region_3}"/>
+    </Sequence>
+  </BehaviorTree>
+
+  <TreeNodesModel>
+    <SubTree ID="SortObjects">
+      <input_port name="object_1">The first object.</input_port>
+      <input_port name="region_1" default="left">Where it goes: any, left, middle or right.</input_port>
+      <input_port name="object_2" default="none">The second object; none: no second.</input_port>
+      <input_port name="region_2" default="middle">Where it goes.</input_port>
+      <input_port name="object_3" default="none">The third object; none: no third.</input_port>
+      <input_port name="region_3" default="right">Where it goes.</input_port>
+    </SubTree>
+  </TreeNodesModel>
+</root>

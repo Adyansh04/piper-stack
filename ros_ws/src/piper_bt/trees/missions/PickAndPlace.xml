@@ -1,0 +1,35 @@
+<?xml version="1.0"?>
+<!--
+  Moves an object on the table. The run's blackboard names it and where it goes:
+
+    object=red cube  place_mode=free  place_region=left
+    object=red cube  place_mode=anchor  place_anchor=blue cube  place_x=0.08  place_y=0
+
+  Optional: pick_approach (top, side or auto), place_x, place_y, place_tolerance_m. The executor
+  refuses a run whose keys are not these (the model below).
+-->
+<root BTCPP_format="4">
+  <BehaviorTree ID="PickAndPlace">
+    <Sequence name="pick_and_place">
+      <SubTree ID="PickFromTable" name="pick_it" object="{object}" approach="{pick_approach}"
+               finger_width_m="{finger_width_m}"/>
+      <SubTree ID="PlaceOnTable" name="place_it" mode="{place_mode}" region="{place_region}"
+               x="{place_x}" y="{place_y}" tolerance_m="{place_tolerance_m}"
+               anchor="{place_anchor}" place_pose="{place_pose}"/>
+      <MoveArmToNamedPose name="back_to_ready" _failureIf="@arm_stuck == true" pose="ready"/>
+    </Sequence>
+  </BehaviorTree>
+
+  <TreeNodesModel>
+    <SubTree ID="PickAndPlace">
+      <input_port name="object">What to move, as SAM 3.1 reads it: red cube.</input_port>
+      <input_port name="pick_approach" default="auto">top, side or auto.</input_port>
+      <input_port name="place_mode" default="free">free, relative, metric or anchor.</input_port>
+      <input_port name="place_region" default="any">free mode: any, left, middle or right.</input_port>
+      <input_port name="place_x" default="0.0">relative -1 to 1, or metres.</input_port>
+      <input_port name="place_y" default="0.0">relative -1 to 1, or metres.</input_port>
+      <input_port name="place_tolerance_m" default="0.05">How far a taken target may move.</input_port>
+      <input_port name="place_anchor" default="none">anchor mode: the object to place next to.</input_port>
+    </SubTree>
+  </TreeNodesModel>
+</root>

@@ -1,0 +1,27 @@
+# Look for objects on the table by an open-vocabulary prompt, view by view until found.
+
+# What to look for, e.g. "red cube".
+string prompt
+
+# Views to try in order; empty uses the configured order. Each is an arm pose (an SRDF state) whose
+# camera shows part of the work area: "full" all of it, "left", "middle" and "right" its thirds.
+string[] views
+
+# Instances scoring below this are left out; 0 uses the configured threshold.
+float32 min_score
+---
+bool success
+string message
+
+# Valid only when success is true. Best first.
+piper_msgs/DetectedObject[] objects
+
+# The view they were found in.
+string view
+
+# Set on a failure: the views the arm reaches were looked at to the end and show none. False when a
+# view failed (perception, motion) or none was reachable: nothing is known about the table then.
+bool nothing_in_view
+---
+# The view being searched.
+string view

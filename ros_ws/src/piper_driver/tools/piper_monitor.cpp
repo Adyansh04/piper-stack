@@ -1,25 +1,31 @@
 // Prints the arm's decoded feedback ten times a second. Read-only: it never sends a frame.
 //
-//   piper_monitor [interface=can0] [seconds=0: until Ctrl-C]
+//   piper_monitor [interface=can_follower] [seconds=0: until Ctrl-C]
 
 #include <atomic>
 #include <chrono>
 #include <csignal>
+#include <cstdint>
+#include <cstdio>
+#include <exception>
 #include <numbers>
 #include <print>
 #include <string>
 #include <thread>
 
 #include "piper_driver/arm.hpp"
+#include "piper_driver/protocol.hpp"
 
 namespace
 {
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables): set by the signal handler
 std::atomic<bool> g_stop{false};
 }  // namespace
 
 int main(int argc, char ** argv)
+try
 {
-    const std::string interface = argc > 1 ? argv[1] : "can0";
+    const std::string interface = argc > 1 ? argv[1] : "can_follower";
     const double seconds = argc > 2 ? std::stod(argv[2]) : 0.0;
     std::signal(SIGINT, [](int) { g_stop = true; });
     std::signal(SIGTERM, [](int) { g_stop = true; });
@@ -38,7 +44,7 @@ int main(int argc, char ** argv)
         std::this_thread::sleep_for(std::chrono::milliseconds{100});
         const auto & s = (*arm)->latest();
         std::print("joints deg:");
-        for (double q : s.position_rad)
+        for (const double q : s.position_rad)
         {
             std::print(" {:8.3f}", q * kDeg);
         }
@@ -78,4 +84,9 @@ int main(int argc, char ** argv)
         }
     }
     return 0;
+}
+catch (const std::exception & e)
+{
+    std::fputs(e.what(), stderr);
+    return 1;
 }
