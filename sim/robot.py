@@ -163,6 +163,56 @@ def set_mujoco_gains(stage, root: str, drives: dict) -> int:
     return count
 
 
+def set_sdf_collision(stage, root: str, newton: dict) -> int:
+    """Turn some links' collision meshes into signed distance fields (SDF) for Newton.
+
+    The URDF importer gives every link a convex hull, which under Newton collides with no SDF
+    mesh: fingers so made pass through a task's parts. The importer instances each link's collision
+    mesh, so each instance is made editable before its mesh is changed.
+
+    Args:
+        stage: The stage, the robot loaded.
+        root: The robot's prim.
+        newton: sim.yaml's newton section: ``sdf_links``, ``sdf_resolution`` (cells along a mesh's
+            longest side), ``sdf_band_m`` and ``contact_gap_m`` (metres).
+
+    Returns:
+        The number of meshes changed.
+    """
+    from pxr import PhysxSchema, Sdf, Usd, UsdPhysics
+
+    links = set(newton['sdf_links'])
+    # A link's collision instance shares the link's name (its look is <link>_gray).
+    instances = [
+        prim
+        for prim in Usd.PrimRange(stage.GetPrimAtPath(root))
+        if prim.IsInstance()
+        and prim.GetName() in links
+        and prim.GetParent().GetName() == prim.GetName()
+    ]
+    real = Sdf.ValueTypeNames.Float
+    count = 0
+    for instance in instances:
+        instance.SetInstanceable(False)
+        for prim in Usd.PrimRange(instance):
+            if not prim.HasAPI(UsdPhysics.MeshCollisionAPI):
+                continue
+            UsdPhysics.MeshCollisionAPI(prim).GetApproximationAttr().Set('sdf')
+            PhysxSchema.PhysxSDFMeshCollisionAPI.Apply(prim).CreateSdfResolutionAttr(
+                int(newton['sdf_resolution'])
+            )
+            prim.AddAppliedSchema('NewtonSDFCollisionAPI')
+            for name, type_name, value in (
+                ('sdfMaxResolution', Sdf.ValueTypeNames.Int, int(newton['sdf_resolution'])),
+                ('sdfNarrowBandInner', real, -float(newton['sdf_band_m'])),
+                ('sdfNarrowBandOuter', real, float(newton['sdf_band_m'])),
+                ('contactGap', real, float(newton['contact_gap_m'])),
+            ):
+                prim.CreateAttribute(f'newton:{name}', type_name, custom=False).Set(value)
+            count += 1
+    return count
+
+
 def import_robot(
     urdf_path: Path, cache: Path, packages: dict[str, str], drives: dict
 ) -> tuple[str, str]:

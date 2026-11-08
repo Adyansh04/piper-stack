@@ -7,6 +7,7 @@ robot's ``world`` frame is the simulator's.
 from __future__ import annotations
 
 import logging
+import threading
 
 import numpy as np
 from geometry_msgs.msg import TransformStamped
@@ -14,6 +15,7 @@ from pxr import Gf, Sdf, Usd, UsdGeom, UsdLux, UsdPhysics, UsdShade
 from rclpy.node import Node
 from rclpy.qos import QoSProfile, ReliabilityPolicy
 from rclpy.time import Time
+from std_srvs.srv import Trigger
 from tf2_msgs.msg import TFMessage
 
 log = logging.getLogger('sim.world')
@@ -153,3 +155,82 @@ class GroundTruth:
             r.x, r.y, r.z, r.w = (float(v) for v in pose[3:7])
             msg.transforms.append(tf)
         self.pub.publish(msg)
+
+
+def _like_view(values: np.ndarray, like):
+    """Return values as a physics view takes them: as they are (NumPy) or as Warp on its device."""
+    if not hasattr(like, 'device'):
+        return values
+    import warp as wp
+
+    dtype = wp.float32 if values.dtype.kind == 'f' else wp.int32
+    return wp.array(values, dtype=dtype, device=like.device)
+
+
+class TaskReset:
+    """Puts a task's moving parts back where a state has them, on ``sim/reset_task``.
+
+    The state is the one before the stage named by the node's ``reset_stage`` parameter: the parts
+    of earlier stages at their goals, the others at their starts; empty, the start. The service
+    (std_srvs/Trigger) answers once the simulation loop has moved the parts, at rest.
+
+    Args:
+        node: The simulator's node.
+        spec: The task (sim/task.py), as the simulator placed it.
+        bodies: Each moving part's name and the prim path of its rigid body.
+        timeout_s: How long the service waits for the loop, in wall seconds.
+    """
+
+    def __init__(self, node: Node, spec, bodies: dict[str, str], timeout_s: float = 5.0) -> None:
+        self.spec = spec
+        self.names = list(bodies)
+        self.paths = [bodies[name] for name in self.names]
+        self.timeout_s = timeout_s
+        #: Guards ``pending``, set by the service (rclpy thread) and taken by the loop.
+        self.lock = threading.Lock()
+        self.pending: np.ndarray | None = None
+        self.applied = threading.Event()
+        self.view = None
+        self.sim_view = None
+        self.node = node
+        node.declare_parameter('reset_stage', '')
+        node.create_service(Trigger, 'sim/reset_task', self.on_reset)
+
+    def on_reset(self, request: Trigger.Request, response: Trigger.Response) -> Trigger.Response:
+        """Hand the loop the state's poses and wait for it to set them (rclpy thread)."""
+        import task as task_spec
+
+        stage = self.node.get_parameter('reset_stage').value
+        try:
+            poses = task_spec.state_before(self.spec, stage) if stage else self.spec.states['start']
+        except task_spec.TaskError as error:
+            response.success, response.message = False, str(error)
+            return response
+        self.applied.clear()
+        with self.lock:
+            self.pending = np.array([_pose_xyzw(poses[name]) for name in self.names])
+        response.success = self.applied.wait(self.timeout_s)
+        response.message = (
+            f'Parts set {"before " + stage if stage else "at the start"}'
+            if response.success
+            else 'The simulation loop did not take the reset: is the simulation running?'
+        )
+        return response
+
+    def apply(self, sim_view) -> None:
+        """Set the parts where a pending reset puts them, at rest (simulation loop)."""
+        if sim_view is None:
+            return
+        with self.lock:
+            poses, self.pending = self.pending, None
+        if poses is None:
+            return
+        if self.sim_view is not sim_view:
+            self.view, self.sim_view = sim_view.create_rigid_body_view(self.paths), sim_view
+        like = self.view.get_transforms()
+        indices = _like_view(np.arange(len(self.paths), dtype=np.int32), like)
+        self.view.set_transforms(_like_view(poses.astype(np.float32), like), indices)
+        self.view.set_velocities(
+            _like_view(np.zeros((len(self.paths), 6), dtype=np.float32), like), indices
+        )
+        self.applied.set()

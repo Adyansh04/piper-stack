@@ -45,6 +45,12 @@ Environment variables before the command:
 - `TASK=assembly` (or another folder under `tasks/`): that task's parts on the table at their start
   poses instead of the cubes ([tasks/README.md](../../tasks/README.md)). With MoveIt, the run
   script also starts `piper_skills`' `task_scene`, which puts the parts in MoveIt's planning scene.
+  `TASK_SEED=<n>` places the task's whole scene at random within `world.task_jitter` of there (the
+  fixture where it might stand on the real table). `sim/reset_task` (`std_srvs/Trigger`) puts the
+  parts back as they are just before the stage the `piper_sim` node's `reset_stage` parameter names
+  (empty: the start). Under Newton the fingers collide through signed distance fields
+  (`newton.sdf_links`), as the parts do, and the two finger drives are coupled like the real
+  gripper's mechanism.
 
 `sim/config/sim.yaml` holds the rates, the world (table, cubes and their friction, the task), the
 cameras, Newton's solver settings and the joint drives, with a comment on each value.

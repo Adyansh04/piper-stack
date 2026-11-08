@@ -7,6 +7,7 @@ the table top), in metres; the CAD meshes are in millimetres.
 
 from __future__ import annotations
 
+import dataclasses
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -117,7 +118,8 @@ class Task:
     """A task: its parts, where they are and its cable.
 
     ``fixed`` holds the static parts' world poses; ``states`` the dynamic parts' world poses in
-    each state (start, goal); ``preview`` is task.yaml's preview section as written.
+    each state (start, goal); ``stages`` each stage's name and part, in order; ``preview`` is
+    task.yaml's preview section as written.
     """
 
     name: str
@@ -129,6 +131,7 @@ class Task:
     states: dict[str, dict[str, np.ndarray]]
     cable: Cable | None
     preview: dict
+    stages: tuple[tuple[str, str], ...] = ()
 
 
 def pose_matrix(xyz: list[float], rpy_deg: list[float]) -> np.ndarray:
@@ -453,4 +456,77 @@ def load(task_dir: Path) -> Task:
         states={'start': start, 'goal': goal},
         cable=cable,
         preview=spec.get('preview', {}),
+        stages=_stages(spec.get('stages', []), parts, goal, f'{where}: stages'),
+    )
+
+
+def _stages(entries: list, parts: dict, goal: dict, where: str) -> tuple[tuple[str, str], ...]:
+    """Return each stage's name and part; a stage's part must be dynamic with a goal pose.
+
+    Raises:
+        TaskError: If a stage has no name or part, or names a part that has no goal.
+    """
+    stages = []
+    for i, entry in enumerate(entries):
+        name, part = entry.get('name'), entry.get('part')
+        if not name or part not in parts or not parts[part].dynamic or part not in goal:
+            raise TaskError(f'{where}[{i}]: a stage names itself and a dynamic part with a goal')
+        stages.append((name, part))
+    if len({name for name, _ in stages}) != len(stages):
+        raise TaskError(f'{where}: two stages share a name')
+    return tuple(stages)
+
+
+def state_before(spec: Task, stage: str) -> dict[str, np.ndarray]:
+    """Return the dynamic parts' world poses just before a stage: earlier stages' parts at goal.
+
+    Raises:
+        TaskError: If the task has no such stage.
+    """
+    names = [name for name, _ in spec.stages]
+    if stage not in names:
+        raise TaskError(f'{spec.name} has no stage {stage!r} (stages: {names})')
+    done = {part for _, part in spec.stages[: names.index(stage)]}
+    return {
+        name: spec.states['goal' if name in done else 'start'][name]
+        for name in spec.states['start']
+    }
+
+
+def placement(spec: Task, rng: np.random.Generator, xy_m: float, yaw_deg: float) -> np.ndarray:
+    """Return a random move of a task's whole scene, a 4 x 4 world transform.
+
+    Up to xy_m along x and along y, and up to yaw_deg about the vertical through the static parts'
+    centre (the fixture's, the parts' starts' when there is none), each uniform.
+    """
+    poses = list(spec.fixed.values()) or list(spec.states['start'].values())
+    centre = np.mean([T[:3, 3] for T in poses], axis=0)
+    yaw = np.radians(rng.uniform(-yaw_deg, yaw_deg))
+    c, s = np.cos(yaw), np.sin(yaw)
+    move = np.eye(4)
+    move[:2, :2] = [[c, -s], [s, c]]
+    shift = np.array([*rng.uniform(-xy_m, xy_m, size=2), 0.0])
+    move[:3, 3] = centre + shift - move[:3, :3] @ centre
+    return move
+
+
+def moved(spec: Task, move: np.ndarray) -> Task:
+    """Return the task with its whole scene moved by a world transform.
+
+    Every world pose moves with it: the static parts', each state's and the cable's segments.
+    """
+    cable = spec.cable
+    if cable is not None:
+        cable = dataclasses.replace(
+            cable,
+            centres=cable.centres @ move[:3, :3].T + move[:3, 3],
+            rotations=move[:3, :3] @ cable.rotations,
+        )
+    return dataclasses.replace(
+        spec,
+        fixed={name: move @ T for name, T in spec.fixed.items()},
+        states={
+            state: {n: move @ T for n, T in poses.items()} for state, poses in spec.states.items()
+        },
+        cable=cable,
     )

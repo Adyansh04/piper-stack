@@ -5,8 +5,9 @@ Run inside the sim image (``scripts/run/sim.sh`` does):
     /isaac-sim/python.sh /piper-stack/sim/sim.py --config /piper-stack/sim/config/sim.yaml
 
 HEADLESS and LIVESTREAM (true or false), PHYSICS_ENGINE (physx or newton), SIM_MODE (control or
-shadow) and TASK (a task under tasks/) override app.headless, app.livestream.enabled, app.engine,
-app.mode and world.task. Python because Isaac Sim's scripting API is Python.
+shadow), TASK (a task under tasks/) and TASK_SEED override app.headless, app.livestream.enabled,
+app.engine, app.mode, world.task and world.task_seed. Python because Isaac Sim's scripting API is
+Python.
 """
 
 from __future__ import annotations
@@ -47,6 +48,8 @@ def load_config(path: str) -> dict:
         cfg['app']['mode'] = os.getenv('SIM_MODE')
     if os.getenv('TASK'):
         cfg['world']['task'] = os.getenv('TASK')
+    if os.getenv('TASK_SEED'):
+        cfg['world']['task_seed'] = int(os.getenv('TASK_SEED'))
     if cfg['app']['engine'] not in ENGINES:
         raise ValueError(f'app.engine {cfg["app"]["engine"]!r} is not one of {ENGINES}')
     if cfg['app']['mode'] not in MODES:

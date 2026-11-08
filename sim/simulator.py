@@ -156,6 +156,8 @@ class Arm:
         if self.engine != 'physx':
             self.device = view.get_dof_positions().device
         self.articulations = self.to_view(np.array([0], dtype=np.int32))
+        #: The commanded targets, before the mimic joints' coupling is added to them.
+        self.nominal = world.host_array(view.get_dof_position_targets())[0].astype(float)
         self.history.clear()
         self.view = view
         self.log.info(f'Arm articulation view ready: joints {self.names}')
@@ -186,12 +188,19 @@ class Arm:
         with self.lock:
             command = dict(self.command)
         positions = world.host_array(self.view.get_dof_positions())
-        targets = world.host_array(self.view.get_dof_position_targets()).copy()
+        q_now = positions[0].astype(float)
         for name, value in command.items():
             if name in self.index:
-                targets[0, self.index[name]] = value
+                self.nominal[self.index[name]] = value
+        targets = self.nominal[None, :].copy()
         for follower, leader, multiplier, offset in self.mimics:
             targets[0, follower] = multiplier * targets[0, leader] + offset
+            if not self.shadow:
+                # The real fingers are one mechanism, the simulated ones two drives: both are
+                # steered back onto the mimic relation, so a held part stays centred between them.
+                deviation = q_now[follower] - (multiplier * q_now[leader] + offset)
+                targets[0, follower] -= deviation / 2.0
+                targets[0, leader] += deviation / (2.0 * multiplier)
         if self.shadow and command:
             # The twin shows where the other arm is: set there at rest, the drives holding it.
             self.view.set_dof_positions(self.to_view(targets), self.articulations)
@@ -273,6 +282,7 @@ def simulate(
     cfg: dict,
     arm: Arm,
     truth: world.GroundTruth,
+    reset: world.TaskReset | None,
     stats: StepStats,
     log,
     stop: threading.Event,
@@ -294,6 +304,8 @@ def simulate(
         app.update()
         updates += 1
         truth.publish(SimulationManager.get_simulation_time(), arm.valid_sim_view())
+        if reset is not None:
+            reset.apply(arm.valid_sim_view())
         now = time.perf_counter()
         if now - wall0 > status_period_s:
             sim_now = SimulationManager.get_simulation_time()
@@ -333,13 +345,28 @@ def run(app, cfg: dict, stop: threading.Event) -> None:
             stage, {**cfg['world'], 'cubes': []} if shadow or task else cfg['world']
         )
         fixed = {}
+        reset = None
         if task and not shadow:
             spec = task_spec.load(Path(cfg['world']['tasks_dir']) / task)
+            seed = cfg['world'].get('task_seed')
+            if seed is not None:
+                move = task_spec.placement(
+                    spec, np.random.default_rng(seed), **cfg['world']['task_jitter']
+                )
+                spec = task_spec.moved(spec, move)
+                yaw = np.degrees(np.arctan2(move[1, 0], move[0, 0]))
+                log.info(
+                    f'Task {task} placed with seed {seed}: moved {1e3 * move[0, 3]:+.1f} '
+                    f'{1e3 * move[1, 3]:+.1f} mm and {yaw:+.1f} degrees'
+                )
             fixed = spec.fixed
             files = task_usd.build(spec, Path(r['usd_cache']).parent / 'tasks')
             bodies = task_usd.body_paths(spec, task_usd.add(stage, spec, files))
             objects += list(bodies.items())
             log.info(f'Task {task}: {len(spec.parts)} parts, {len(bodies)} moving')
+            # A cable's segments would stay where they were: only cable-free tasks reset.
+            if spec.cable is None:
+                reset = world.TaskReset(node, spec, bodies)
         usd, urdf = robot.import_robot(
             Path(r['urdf']), Path(r['usd_cache']), r['packages'], r['drives']
         )
@@ -350,6 +377,8 @@ def run(app, cfg: dict, stop: threading.Event) -> None:
         if cfg['app']['engine'] == 'newton':
             count = robot.set_mujoco_gains(stage, '/World/piper', r['drives'])
             log.info(f'MuJoCo actuators given the drives of sim.yaml: {count}')
+            count = robot.set_sdf_collision(stage, '/World/piper', cfg['newton'])
+            log.info(f'Robot collision meshes made signed distance fields: {count}')
         app.update()
         root = find_articulation_root(stage, '/World/piper')
         arm = Arm(
@@ -423,7 +452,7 @@ def run(app, cfg: dict, stop: threading.Event) -> None:
             f'({SimulationManager.get_active_physics_engine()}), render {render_hz} Hz, '
             f'real time {cfg["app"]["real_time"]}, articulation {root}'
         )
-        simulate(app, cfg, arm, truth, stats, log, stop)
+        simulate(app, cfg, arm, truth, reset, stats, log, stop)
         log.info('Shutting down')
     finally:
         app_utils.stop()

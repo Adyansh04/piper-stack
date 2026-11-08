@@ -40,6 +40,12 @@ world:
   # start poses; null: the cubes. TASK overrides it.
   task: null
   tasks_dir: /piper-stack/tasks
+  # A seed (TASK_SEED overrides it) places the task's whole scene at random within task_jitter of
+  # where task.yaml puts it: up to xy_m along x and along y, up to yaw_deg about its centre. Data
+  # recorded on several seeds sees the fixture where it would stand on the real table. null: as
+  # task.yaml has it.
+  task_seed: null
+  task_jitter: {xy_m: 0.015, yaw_deg: 8.0}
   light_intensity: 1000.0
   floor_colour: [0.35, 0.35, 0.37]
   # The arm stands at the table's edge: the robot's base at the world origin on the top (z 0).
@@ -94,6 +100,14 @@ newton:
   # Constraint rows and contacts the solver holds per world.
   njmax: 2000
   nconmax: 1000
+  # Robot links whose collision meshes become signed distance fields: a convex hull (the URDF
+  # importer's) does not collide with a task's SDF parts, so the fingers would pass through them.
+  # Cells along a mesh's longest side (256 on the 76 mm finger: 0.3 mm), and the field's band and
+  # the contact gap as task.yaml's contact, metres.
+  sdf_links: [link7, link8]
+  sdf_resolution: 256
+  sdf_band_m: 0.002
+  contact_gap_m: 0.002
 
 # The overhead RGB camera: a standard USB camera on a stand above the work area. Its optical frame
 # is in the robot description (piper.urdf.xacro's overhead_camera args: 1 m above the table,

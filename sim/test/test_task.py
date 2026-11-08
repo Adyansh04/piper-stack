@@ -142,3 +142,37 @@ def test_a_pose_in_an_unknown_frame_is_refused(tmp_path: Path) -> None:
     )
     with pytest.raises(task.TaskError, match='nowhere'):
         task.load(tmp_path)
+
+
+def test_the_assembly_stages_come_in_order(tasks: dict[str, task.Task]) -> None:
+    assembly = tasks['assembly']
+    assert [name for name, _ in assembly.stages] == ['ring', 'collar', 'pin', 'cap']
+    before_ring = task.state_before(assembly, 'ring')
+    for name, T in before_ring.items():
+        np.testing.assert_allclose(T, assembly.states['start'][name])
+    before_cap = task.state_before(assembly, 'cap')
+    for name in ('ring', 'collar', 'pin'):
+        np.testing.assert_allclose(before_cap[name], assembly.states['goal'][name])
+    np.testing.assert_allclose(before_cap['cap'], assembly.states['start']['cap'])
+    with pytest.raises(task.TaskError, match='no stage'):
+        task.state_before(assembly, 'nut')
+
+
+def test_a_moved_scene_keeps_every_part_where_it_is_on_the_fixture(
+    tasks: dict[str, task.Task],
+) -> None:
+    assembly = tasks['assembly']
+    move = task.placement(assembly, np.random.default_rng(3), xy_m=0.015, yaw_deg=8.0)
+    shifted = task.moved(assembly, move)
+    fixture, moved_fixture = assembly.fixed['fixture'], shifted.fixed['fixture']
+    # The fixture moves within the bounds about its own centre, staying flat.
+    assert np.all(np.abs(moved_fixture[:2, 3] - fixture[:2, 3]) <= 0.015 + 1e-12)
+    assert abs(np.degrees(np.arctan2(move[1, 0], move[0, 0]))) <= 8.0
+    np.testing.assert_allclose(moved_fixture[2], fixture[2], atol=1e-12)
+    for state in ('start', 'goal'):
+        for name, T in assembly.states[state].items():
+            np.testing.assert_allclose(
+                np.linalg.inv(moved_fixture) @ shifted.states[state][name],
+                np.linalg.inv(fixture) @ T,
+                atol=1e-12,
+            )
