@@ -154,6 +154,7 @@ class PiperReachEnvCfg(ReachEnvCfg):
             preserve_order=True,
             scale=controller['action_scale'],
             max_velocity=controller['max_velocity'],
+            limit_margin=controller['limit_margin_rad'],
             max_acceleration=controller['max_acceleration'],
         )
 

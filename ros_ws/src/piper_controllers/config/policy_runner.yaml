@@ -20,6 +20,9 @@ policy_runner:
     # firmware's own acceleration cap, in rad/s^2.
     max_velocity: 1.0
     max_acceleration: 0.5
+    # Wanted positions stay this far inside the URDF's joint limits, rad: more than MoveIt Servo's
+    # joint_limit_margins (servo.yaml), which halts the arm on any joint past its margin.
+    limit_margin_rad: 0.03
     # How fast a jog closes the gap between the ramp's command and the measured position, 1/s:
     # Servo moves on from the measured state, so without it a tracking lag stays as a shortfall.
     tracking_gain: 5.0

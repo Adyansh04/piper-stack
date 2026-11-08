@@ -59,14 +59,15 @@ unsigned int decimationOf(double jog_period_s, double policy_rate_hz)
 }
 
 /**
- * @brief Each joint's lower and upper position limit from a URDF, rad.
+ * @brief Each joint's lower and upper position limit from a URDF, moved in by a margin, rad.
  * @param[in] description The URDF.
  * @param[in] joints The joints.
+ * @param[in] margin_rad How far inside the URDF's limits, rad.
  * @throws std::runtime_error If no joint is named, the URDF does not parse or a joint has no
  * limits.
  */
 std::pair<std::vector<double>, std::vector<double>> jointLimits(
-    const std::string & description, const std::vector<std::string> & joints)
+    const std::string & description, const std::vector<std::string> & joints, double margin_rad)
 {
     if (joints.empty())
     {
@@ -86,8 +87,8 @@ std::pair<std::vector<double>, std::vector<double>> jointLimits(
         {
             throw std::runtime_error("Joint " + name + " has no limits in the description");
         }
-        lower_rad.push_back(joint->limits->lower);
-        upper_rad.push_back(joint->limits->upper);
+        lower_rad.push_back(joint->limits->lower + margin_rad);
+        upper_rad.push_back(joint->limits->upper - margin_rad);
     }
     return {std::move(lower_rad), std::move(upper_rad)};
 }
@@ -191,8 +192,10 @@ private:
     /// @brief The ramp of the joints, with their limits from the robot description.
     JointRamp makeRamp()
     {
-        auto [lower_rad, upper_rad] =
-            jointLimits(declare_parameter("robot_description", std::string()), joints_);
+        auto [lower_rad, upper_rad] = jointLimits(
+            declare_parameter("robot_description", std::string()),
+            joints_,
+            declare_parameter("limit_margin_rad", 0.03));
         return {
             std::move(lower_rad),
             std::move(upper_rad),

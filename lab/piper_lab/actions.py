@@ -37,8 +37,8 @@ class RampedJointPositionAction(JointAction):
         self._velocity = torch.zeros_like(self._raw_actions)
         self._target = torch.zeros_like(self._raw_actions)
         limits = self._asset.data.soft_joint_pos_limits.torch[:, self._joint_ids]
-        self._lower = limits[..., 0].clone()
-        self._upper = limits[..., 1].clone()
+        self._lower = limits[..., 0] + cfg.limit_margin
+        self._upper = limits[..., 1] - cfg.limit_margin
 
     def process_actions(self, actions: torch.Tensor) -> None:
         """Turn the policy's actions into wanted positions inside the joint limits."""
@@ -75,6 +75,8 @@ class RampedJointPositionActionCfg(JointActionCfg):
     class_type: type = RampedJointPositionAction
 
     max_velocity: float = MISSING
+    #: How far inside the joint limits the wanted positions stay, rad (the runner's margin).
+    limit_margin: float = MISSING
     """Fastest commanded joint velocity, in rad/s."""
 
     max_acceleration: float = MISSING
