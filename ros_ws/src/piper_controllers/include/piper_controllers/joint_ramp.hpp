@@ -66,6 +66,12 @@ public:
      */
     std::span<const double> step(double dt_s) noexcept;
 
+    /// @brief The commanded velocity of each joint after the last step, rad/s.
+    [[nodiscard]] std::span<const double> velocities() const noexcept
+    {
+        return velocity_rad_s_;
+    }
+
 private:
     std::vector<double> lower_rad_;
     std::vector<double> upper_rad_;

@@ -62,7 +62,7 @@ def generate_launch_description():
         [FindPackageShare('piper_bringup'), 'config', 'controllers.yaml']
     )
 
-    def spawner(name, condition=None, extra=()):
+    def spawner(name, condition=None):
         return Node(
             package='controller_manager',
             executable='spawner',
@@ -73,7 +73,6 @@ def generate_launch_description():
                 '/controller_manager',
                 '--param-file',
                 controllers,
-                *extra,
             ],
             condition=condition,
         )
@@ -134,8 +133,9 @@ def generate_launch_description():
                 'policy',
                 default_value='',
                 description='A trained reach policy (policy.onnx, with its policy.onnx.data beside '
-                "it): load piper_controllers' policy_controller with it, inactive until switched "
-                'in for arm_controller. Empty: no policy controller.',
+                "it): start piper_controllers' policy_runner with it, which moves the arm through "
+                'MoveIt Servo (needs moveit:=true servo:=true), inactive until its ~/set_active. '
+                'Empty: no policy runner.',
             ),
             DeclareLaunchArgument(
                 'rviz',
@@ -159,11 +159,14 @@ def generate_launch_description():
             spawner('joint_state_broadcaster'),
             spawner('arm_controller', IfCondition(motion)),
             spawner('gripper_controller', IfCondition(motion)),
-            spawner(
-                'policy_controller',
-                IfCondition(NotEqualsSubstitution(policy, '')),
-                # One argument: the spawner would read a separate '-p ...' as its own option.
-                extra=['--inactive', ['--controller-ros-args=-p model_path:=', policy]],
+            IncludeLaunchDescription(
+                PythonLaunchDescriptionSource(
+                    PathJoinSubstitution(
+                        [FindPackageShare('piper_controllers'), 'launch', 'policy_runner.launch.py']
+                    )
+                ),
+                launch_arguments={'model_path': policy, 'use_sim_time': use_sim_time}.items(),
+                condition=IfCondition(NotEqualsSubstitution(policy, '')),
             ),
             IncludeLaunchDescription(
                 PythonLaunchDescriptionSource(

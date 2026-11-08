@@ -48,9 +48,11 @@ same frames, at the real camera's default resolution and focal length, so the pe
 skills see no difference. In shadow mode the
 simulator is a digital twin instead: it follows the real arm's `/joint_states`.
 
-Isaac Lab (`lab/`) trains on the same robot USD, drives and table, and with the policy
-controller's own motion law and parameters (`controllers.yaml`), so a policy exported to ONNX runs
-unchanged in `piper_controllers`' policy controller on any of the three systems.
+Isaac Lab (`lab/`) trains on the same robot USD, drives and table, and with the policy runner's
+own motion law and parameters (`policy_runner.yaml`), so a policy exported to ONNX runs unchanged
+in `piper_controllers`' policy runner on any of the three systems. The runner moves the arm through
+MoveIt Servo's joint jogs, as LeRobot's policies do through `piper_lerobot`'s bridge: every policy
+command passes Servo's collision, joint limit and singularity checks.
 
 ## 3. A pick and place, step by step
 

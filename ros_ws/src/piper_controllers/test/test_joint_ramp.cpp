@@ -176,6 +176,29 @@ TEST(JointRamp, MovesNothingOnAStepThatIsNotPositive)
     }
 }
 
+TEST(JointRamp, ReportsTheVelocitiesItMovesTheCommandsAt)
+{
+    // The policy runner sends these to MoveIt Servo, which integrates them as the ramp does.
+    JointRamp ramp = twoJoints();
+    const std::array<double, 2> start{0.0, 0.0};
+    ramp.reset(start);
+    const std::array<float, 2> actions{1.0F, -1.0F};
+    ramp.want(actions);
+    std::array<double, 2> previous{0.0, 0.0};
+    for (int i = 0; i < 400; ++i)
+    {
+        const auto targets = ramp.step(kDtS);
+        const auto velocities = ramp.velocities();
+        ASSERT_EQ(velocities.size(), 2U);
+        for (std::size_t j = 0; j < 2; ++j)
+        {
+            EXPECT_NEAR(targets[j] - previous[j], velocities[j] * kDtS, 1e-12);
+            EXPECT_LE(std::abs(velocities[j]), kMaxVel + 1e-12);
+            previous[j] = targets[j];
+        }
+    }
+}
+
 TEST(JointRamp, RefusesInconsistentLimitsOffsetsAndCaps)
 {
     EXPECT_THROW(

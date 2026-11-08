@@ -1,0 +1,25 @@
+# The reach policy runner (policy_runner.launch.py; bringup's policy:=<onnx file>). The reach task
+# in lab/ trains with these values (it reads this file), so a policy and the runner agree: retrain
+# after changing any of them.
+policy_runner:
+  ros__parameters:
+    joints: [joint1, joint2, joint3, joint4, joint5, joint6]
+    # Set by the launch (model_path:=).
+    model_path: ""
+    # The frame of the targets on ~/target_pose: the robot's base.
+    frame: "base_link"
+    # Policy steps a second, and ramp steps (Servo jogs) a second: a whole multiple of it, as the
+    # 200 Hz control loop the task trains at.
+    policy_rate_hz: 50.0
+    jog_rate_hz: 200.0
+    # Wanted joint positions at a zero action (rad: SRDF ready), and their change per unit of
+    # action (rad).
+    action_offset: [0.0, 1.32, -1.14, 0.0, 1.1, 0.0]
+    action_scale: 0.5
+    # Caps of the commanded joint motion: a third of the firmware's 3 rad/s, in rad/s, and the
+    # firmware's own acceleration cap, in rad/s^2.
+    max_velocity: 1.0
+    max_acceleration: 0.5
+    # MoveIt Servo's joint jog input and the service that switches it to joint jogs.
+    jog_topic: "/servo_node/delta_joint_cmds"
+    command_type_service: "/servo_node/switch_command_type"

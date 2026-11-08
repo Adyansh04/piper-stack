@@ -3,11 +3,12 @@
 After Isaac Lab's deployed UR10e reach task (``isaaclab_tasks.contrib.deploy.reach``), on the
 simulator's own robot USD, joint drives and table (``sim/robot.py``, ``sim/config/sim.yaml``), so a
 policy trained here drives the arm that Isaac Sim simulates for the stack. The joints, the
-action's offsets and scale, the motion caps and the policy rate are those of the stack's policy
-controller (``piper_bringup``'s controllers.yaml), which runs the exported policy: 50 Hz on 200 Hz
-physics. The policy observes its joints (positions in radians, velocities in rad/s) and the target
-pose in the base frame (position, then the quaternion x, y, z, w), and asks for those joints'
-positions, which :mod:`piper_lab.actions` approaches under the caps.
+action's offsets and scale, the motion caps and the rates are those of the stack's policy runner
+(``piper_controllers``' policy_runner.yaml), which runs the exported policy through MoveIt Servo:
+50 Hz policy steps on a 200 Hz ramp. The policy observes its joints (positions in radians,
+velocities in rad/s) and the target pose in the base frame (position, then the quaternion x, y, z,
+w), and asks for those joints' positions, which :mod:`piper_lab.actions` approaches under the
+caps.
 """
 
 from __future__ import annotations
@@ -34,9 +35,9 @@ from piper_lab.actions import RampedJointPositionActionCfg
 
 #: The repository: ``sim/`` holds the simulator's robot import and configuration.
 ROOT = Path(__file__).resolve().parents[2]
-#: The stack's controller configuration: its ``policy_controller`` section sets the joints, the
-#: action's offsets and scale, the motion caps and the policy rate the task trains with.
-CONTROLLER_CONFIG = ROOT / 'ros_ws' / 'src' / 'piper_bringup' / 'config' / 'controllers.yaml'
+#: The stack's policy runner configuration: it sets the joints, the action's offsets and scale, the
+#: motion caps and the rates the task trains with.
+RUNNER_CONFIG = ROOT / 'ros_ws' / 'src' / 'piper_controllers' / 'config' / 'policy_runner.yaml'
 #: The importer nests each moving link under its parent and merges fixed ones into theirs
 #: (base_link into world, gripper_base and the tcp into link6).
 BASE_PATH = '{ENV_REGEX_NS}/Robot/Geometry/world'
@@ -59,9 +60,9 @@ def _sim_robot():
     return module
 
 
-def policy_controller() -> dict:
-    """Return the policy controller's parameters, as ``piper_bringup`` configures them."""
-    return yaml.safe_load(CONTROLLER_CONFIG.read_text())['policy_controller']['ros__parameters']
+def policy_runner() -> dict:
+    """Return the policy runner's parameters, as ``piper_controllers`` configures them."""
+    return yaml.safe_load(RUNNER_CONFIG.read_text())['policy_runner']['ros__parameters']
 
 
 def _arm(joints: list[str]) -> SceneEntityCfg:
@@ -117,7 +118,7 @@ class PiperReachEnvCfg(ReachEnvCfg):
         """Fill the template with the Piper, its table, actions, targets and randomisation."""
         super().__post_init__()
         sim_cfg = yaml.safe_load((ROOT / 'sim' / 'config' / 'sim.yaml').read_text())
-        controller = policy_controller()
+        controller = policy_runner()
         joints = controller['joints']
         start = dict(zip(joints, controller['action_offset'], strict=True))
         self.scene.robot, tcp = piper_cfg(sim_cfg['robot'], start)
@@ -205,6 +206,9 @@ class PiperReachEnvCfg(ReachEnvCfg):
         # The stack's joint loop: physics at its rate (200 Hz), a policy step every few.
         physics_hz = sim_cfg['app']['physics_hz']
         self.sim.dt = 1.0 / physics_hz
+        # The runner ramps at jog_rate_hz as training does at the physics rate.
+        if controller['jog_rate_hz'] != physics_hz:
+            raise ValueError(f'jog_rate_hz must be the physics rate of {physics_hz} Hz')
         self.decimation = round(physics_hz / controller['policy_rate_hz'])
         if self.decimation < 1 or self.decimation * controller['policy_rate_hz'] != physics_hz:
             raise ValueError(f'policy_rate_hz must divide the physics rate of {physics_hz} Hz')

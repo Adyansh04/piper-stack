@@ -1,7 +1,0 @@
-<library path="piper_controllers">
-  <class name="piper_controllers/PolicyController"
-         type="piper_controllers::PolicyController"
-         base_class_type="controller_interface::ControllerInterface">
-    <description>A trained reach policy (ONNX) that moves the joints towards a target pose of the tool.</description>
-  </class>
-</library>

@@ -3,23 +3,25 @@
 <package format="3">
   <name>piper_controllers</name>
   <version>0.1.0</version>
-  <description>ros2_control controllers of the Piper: a trained reach policy (ONNX) that moves the joints towards a target pose, ramped under the arm's velocity and acceleration caps.</description>
+  <description>Trained policies (ONNX) on the Piper: a node that moves the arm with a reach policy through MoveIt Servo, ramped under the arm's velocity and acceleration caps.</description>
   <maintainer email="gupta.adyansh@gmail.com">Adyansh Gupta</maintainer>
   <license>BSD-3-Clause</license>
 
   <buildtool_depend>ament_cmake</buildtool_depend>
   <buildtool_depend>piper_cmake</buildtool_depend>
 
-  <depend>controller_interface</depend>
+  <depend>control_msgs</depend>
   <depend>geometry_msgs</depend>
-  <depend>hardware_interface</depend>
+  <depend>moveit_msgs</depend>
   <depend>onnxruntime_vendor</depend>
-  <depend>pluginlib</depend>
   <depend>rclcpp</depend>
-  <depend>rclcpp_lifecycle</depend>
-  <depend>realtime_tools</depend>
+  <depend>sensor_msgs</depend>
+  <depend>std_srvs</depend>
   <depend>urdf</depend>
 
+  <exec_depend>launch_ros</exec_depend>
+  <exec_depend>piper_description</exec_depend>
+  <exec_depend>xacro</exec_depend>
   <test_depend>ament_cmake_gtest</test_depend>
 
   <export>

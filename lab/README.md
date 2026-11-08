@@ -46,9 +46,9 @@ training or a heavier orientation reward should improve.
   0.02 rad/s, and up to one policy step late) and the target in the base frame (position in m,
   then the quaternion x, y, z, w).
 - Actions, at 50 Hz: each joint's wanted position, which `piper_lab.actions` approaches under the
-  velocity and acceleration caps, as the policy controller does on the stack. The joints, offsets,
-  scale, caps and rate come from the policy controller's section of
-  `piper_bringup/config/controllers.yaml`, so a trained policy always matches its controller.
+  velocity and acceleration caps, as the stack's policy runner does through MoveIt Servo. The
+  joints, offsets, scale, caps and rates come from `piper_controllers/config/policy_runner.yaml`,
+  so a trained policy always matches its runner.
 - Targets: 15 to 30 cm in front of the base, up to 15 cm to either side, 3 to 10 cm above the
   table, the tool pointing down within 15 degrees and turned up to 90 degrees about the vertical;
   two targets in an episode of 12 s, starting from `ready`.
