@@ -17,6 +17,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         python3-colcon-common-extensions python3-rosdep \
         ros-lyrical-ros2-control \
         ros-lyrical-ros2-controllers \
+        ros-lyrical-joint-state-topic-hardware-interface \
         ros-lyrical-realtime-tools \
         ros-lyrical-xacro \
         ros-lyrical-robot-state-publisher \
@@ -88,11 +89,31 @@ RUN apt-get update && apt-get install -y --no-install-recommends shellcheck \
     && rm -rf /var/lib/apt/lists/* \
     && UV_TOOL_DIR=/opt/uv-tools UV_TOOL_BIN_DIR=/usr/local/bin uv tool install "ruff==${RUFF_VERSION}"
 
-# The simulator's ros2_control hardware (hardware:=isaac): joint commands and states over topics.
-# Late in the file, so adding it did not rebuild the layers above.
-RUN apt-get update && apt-get install -y --no-install-recommends \
-        ros-lyrical-joint-state-topic-hardware-interface \
-    && rm -rf /var/lib/apt/lists/*
+# PlotJuggler 4 for live plots and bags (layouts in piper_bringup/config/plotjuggler), with its
+# official ROS 2 topic subscriber, ROS message parser and MCAP loader, each checked by sha256. Its
+# apt repository serves amd64 only: an arm64 image goes without.
+ARG PLOTJUGGLER_VERSION=4.1.0-1
+ARG PJ_PLUGINS=https://github.com/PlotJuggler/pj-official-plugins/releases/download
+RUN if [ "$(dpkg --print-architecture)" = amd64 ]; then \
+        install -d -m 0755 /etc/apt/keyrings \
+        && curl -fsSL https://apt.plotjuggler.io/plotjuggler-archive-keyring.asc \
+            -o /etc/apt/keyrings/plotjuggler.asc \
+        && echo "deb [arch=amd64 signed-by=/etc/apt/keyrings/plotjuggler.asc] https://apt.plotjuggler.io stable main" \
+            > /etc/apt/sources.list.d/plotjuggler.list \
+        && apt-get update \
+        && apt-get install -y --no-install-recommends "plotjuggler4=${PLOTJUGGLER_VERSION}" unzip \
+        && rm -rf /var/lib/apt/lists/* \
+        && ext=/home/ubuntu/.local/share/PlotJuggler/PlotJuggler4/extensions && mkdir -p "${ext}" \
+        && fetch() { curl -fsSL -o /tmp/extension.zip "${PJ_PLUGINS}/$1" \
+            && echo "$2  /tmp/extension.zip" | sha256sum -c - \
+            && unzip -q /tmp/extension.zip -d "${ext}" && rm /tmp/extension.zip; } \
+        && fetch data_stream_ros2%2Fv1.1.3/ros2-topic-subscriber-1.1.3-linux-x86_64.zip \
+            5eae8410957081cfda8ed431d0bc4f62e3c2e57100e48d83f9e6cd70c7c73465 \
+        && fetch parser_ros%2Fv1.3.1/ros-parser-1.3.1-linux-x86_64.zip \
+            62483526525c036ef59f6564ba30501e34c660bdd4de17cc843fa07f4bf40df0 \
+        && fetch data_load_mcap%2Fv1.3.0/mcap-loader-1.3.0-linux-x86_64.zip \
+            d58dc3ab1af06783d8bf0ce3a488b18ff480ac3fbea4f6e2425d30230eee4038; \
+    fi
 
 # The container runs as the host user so that files it writes in the checkout stay the user's: the
 # base image's own user `ubuntu` takes the host's IDs.
