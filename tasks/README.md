@@ -27,12 +27,25 @@ simulator (`sim/`) and Isaac Lab (`lab/`) read the same files.
 | `parts.<part>.shapes` | Each mesh: `collision` (`sdf`, `convex_hull`, `convex_decomposition` or `none`), `sdf_resolution` (cells along the mesh's longest side), `colour`, `metallic`, `roughness`. |
 | `cable` | A cable from a dynamic part (its plug) to an anchor: radius, mass per metre, bending and torsional stiffness, damping, and its path at the start. |
 | `scene` | Poses: `fixed` for static parts, `start` and `goal` for dynamic ones. |
+| `stages` | The steps of the task in order, each one part put at its goal on its mate (below). |
 | `preview` | The arm's joints and the camera views for the preview images. |
 
 A pose is `xyz` in metres and `rpy` in degrees (roll, pitch and yaw about the fixed axes, as in
 URDF), in the robot's world frame (its base at the origin on the table top) or in the frame of the
 part named by `in`. Use `sdf` collision for anything that mates closely (threads, slots, pockets,
 the connector); it is the most accurate and the costliest.
+
+Each stage names its `part` (whose goal is `in` another part, its mate) and gives:
+
+| Key | Holds |
+|---|---|
+| `grasp` | The TCP's pose in the part's frame (`xyz`, `rpy`; the gripper points down the TCP's z and the fingers close along its y), `opening_m` (each finger's opening before it closes) and `symmetry` (2: the grasp also holds the part turned half a turn). |
+| `approach_m` | How far above where its motion starts the part comes down from. |
+| `release_m` | How far above its path the part moves and is let go. |
+| `motion` | `insert`, `screw` (with `screw: {pitch_m, turns}`, a right-hand thread from `turns` above the seat) or `twist` (with `twist_deg`, negative clockwise seen from above). |
+| `contacts` | Pairs of parts or robot links that may touch while the stage runs. |
+
+`piper_skills`' `run_stage` runs a stage on the arm through MoveIt.
 
 The simulator turns a task into USD files once per change of the task (`sim/task_usd.py`, cached
 in `data/sim/tasks/`): each part with its collision for PhysX and Newton, its mass properties from

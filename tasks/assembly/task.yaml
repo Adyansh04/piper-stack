@@ -79,13 +79,60 @@ scene:
     collar: {in: fixture, xyz: [-0.01, -0.042, 0.007]}
     cap: {in: fixture, xyz: [0.085, 0.036, 0.007]}
     pin: {in: fixture, xyz: [0.06, -0.042, 0.002]}
-  # Assembled: the collar seated on the base (its yaw follows the thread), the cap's lugs locked
-  # 30 degrees clockwise from the collar's entries.
+  # Assembled. The collar's yaw where it seats is the threads' phase: its crest centred in the
+  # boss's root (the crest helices fitted to the meshes); Newton's thread probe seated it within
+  # 10 degrees of it. The cap's lugs lock 30 degrees clockwise from the collar's entries.
   goal:
     ring: {in: base, xyz: [-0.035, 0.0, 0.012], rpy: [0, 0, 180]}
-    collar: {in: base, xyz: [0.035, 0.0, 0.012]}
+    collar: {in: base, xyz: [0.035, 0.0, 0.012], rpy: [0, 0, -76.4]}
     pin: {in: base, xyz: [0.035, 0.0, 0.014]}
-    cap: {in: base, xyz: [0.035, 0.0, 0.02], rpy: [0, 0, -30]}
+    cap: {in: collar, xyz: [0.0, 0.0, 0.008], rpy: [0, 0, -30]}
+
+# The stages in order (piper_skills' run_stage). Each takes its part where it lies and puts it at
+# its goal pose, relative to the part its goal is in (its mate). grasp: the TCP's pose in the
+# part's frame (the gripper points down the TCP's z, the fingers close along its y), each finger's
+# opening from closed before it closes on the part, and the part's symmetry about its z (2: the
+# grasp also works turned half a turn). The part comes down onto its mate along the goal's z from
+# approach_m above where its motion starts, and is let go release_m above where it ends.
+# motion: insert (straight down onto the goal), screw (onto a right-hand thread of pitch_m: from
+# turns above the seat, turned down to it, regrasped every half turn), twist (inserted turned back
+# by twist_deg, then turned by it about the goal's z; negative is clockwise seen from above).
+# contacts: the parts and robot links the stage lets touch in MoveIt's scene, besides the fingers
+# on its own part.
+stages:
+  # The fingers reach 6.3 mm below the TCP: each grasp keeps their tips 1 mm or more above the
+  # fixture and the base's plate.
+  - name: ring
+    part: ring
+    grasp: {xyz: [0.0, 0.0, 0.0105], rpy: [180, 0, 90], opening_m: 0.022, symmetry: 2}
+    approach_m: 0.035
+    release_m: 0.001
+    motion: insert
+    contacts: [[ring, base]]
+  - name: collar
+    part: collar
+    grasp: {xyz: [0.0, 0.0, 0.012], rpy: [180, 0, 90], opening_m: 0.025, symmetry: 2}
+    approach_m: 0.03
+    release_m: 0.0
+    # 2.6 turns engage the thread; the screw starts 0.2 turn above that, still free.
+    motion: screw
+    screw: {pitch_m: 0.0035, turns: 2.8}
+    contacts: [[collar, base]]
+  - name: pin
+    part: pin
+    grasp: {xyz: [0.0, 0.0, 0.025], rpy: [180, 0, 90], opening_m: 0.012, symmetry: 2}
+    approach_m: 0.03
+    release_m: 0.001
+    motion: insert
+    contacts: [[pin, base]]
+  - name: cap
+    part: cap
+    grasp: {xyz: [0.0, 0.0, 0.011], rpy: [180, 0, 90], opening_m: 0.03, symmetry: 2}
+    approach_m: 0.03
+    release_m: 0.0
+    motion: twist
+    twist_deg: -30
+    contacts: [[cap, collar], [cap, pin], [cap, base]]
 
 # Images of the assets (sim/preview.py): the arm's joints (radians, metres for the fingers) and
 # the views, eye and target in the world frame.
