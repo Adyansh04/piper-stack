@@ -3,6 +3,10 @@
 app:
   # HEADLESS (true or false) overrides this.
   headless: true
+  # control: the stack drives the arm (hardware:=isaac). shadow: a digital twin, the arm follows
+  # the joint states of a stack on the real (or mock) arm, with no /clock, no cubes and its camera
+  # beside the real one (the shadow section). SIM_MODE overrides this.
+  mode: control
   # physx or newton (MuJoCo-Warp); PHYSICS_ENGINE overrides this.
   engine: physx
   # Where each engine runs: PhysX's articulations on the CPU, Newton (Warp) on the GPU.
@@ -62,6 +66,13 @@ camera:
   far_m: 5.0
   # Frames a second; the nearest of render_hz / n is used.
   rate_hz: 25.0
+
+shadow:
+  # The joint states the twin follows, and where it publishes its own to compare with them.
+  joint_states_topic: /joint_states
+  state_topic: /shadow/joint_states
+  # The twin camera's namespace, beside the real camera's wrist_camera.
+  camera_namespace: shadow/wrist_camera
 
 robot:
   # The expanded robot description (scripts/run/sim.sh writes it from piper_description).

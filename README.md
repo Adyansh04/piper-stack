@@ -31,6 +31,30 @@ wrist camera, then the stack on `hardware:=isaac`, on the simulator's clock. The
 compiles shaders for a few minutes. `sim/config/sim.yaml` sets the physics and render rates, the
 world and the camera.
 
+```bash
+./scripts/run/sim.sh mission
+```
+
+adds SAM 3.1, GraspGenX, the pick and place skills (`piper_skills`) and the behaviour tree executor
+(`piper_bt`), with a pane that sends a `PickAndPlace` run (the red cube to the table's left third)
+each time Enter is pressed. `./scripts/run/real.sh mission enable:=true` does the same on the real
+arm; any motion there needs the operator at the arm.
+
+With a stack on the real arm running (`./scripts/run/real.sh arm`), `./scripts/run/sim.sh shadow`
+starts Isaac Sim as its digital twin: the simulated arm follows `/joint_states`, publishes its own
+state on `/shadow/joint_states` and renders its wrist camera under `/shadow/wrist_camera`, next to
+the real camera's images. The twin publishes no `/clock` and has no cubes.
+
+### Recording and plots
+
+```bash
+ros2 launch piper_bringup record.launch.py profile:=mission
+plotjuggler4
+```
+
+`record.launch.py` writes MCAP bags to `data/bags/` (profiles in `piper_bringup`'s README);
+PlotJuggler 4, in the dev image with its ROS 2 extensions, plots live topics and bags.
+
 ## Credits
 
 - [piper_sdk](https://github.com/agilexrobotics/piper_sdk) by AgileX Robotics (MIT): the CAN

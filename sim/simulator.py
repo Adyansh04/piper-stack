@@ -3,8 +3,9 @@
 Imported by sim.py once Isaac Sim runs and its ROS 2 bridge is enabled (rclpy comes with the
 bridge). The joint loop runs in Isaac Sim's physics callback at ``app.physics_hz``: it takes the
 stack's position targets from ``isaac_joint_commands`` and answers on ``isaac_joint_states``, the
-topics of ros-controls' joint_state_topic_hardware_interface (``hardware:=isaac``). Its cost per
-step is in the status line.
+topics of ros-controls' joint_state_topic_hardware_interface (``hardware:=isaac``). In shadow mode
+the arm is a digital twin instead: it takes the joint positions another stack measures and
+publishes its own beside them. Its cost per step is in the status line.
 """
 
 from __future__ import annotations
@@ -67,20 +68,28 @@ class Arm:
     """The arm and its gripper, through the robot's articulation.
 
     The joints follow ``isaac_joint_commands`` (position targets); a joint the URDF makes mimic
-    another follows it as the mimic says; every joint's state goes to ``isaac_joint_states``.
+    another follows it as the mimic says; every joint's state goes to ``isaac_joint_states``. As a
+    twin (``shadow``) the joints are set to the positions on the shadow section's
+    ``joint_states_topic`` every step, at rest, and their state goes to its ``state_topic``.
 
     Args:
         node: The simulator's node.
         articulation_root: Prim path of the robot's articulation root.
         urdf: The robot's URDF text, for its mimic tags.
+        shadow: sim.yaml's ``shadow`` section in shadow mode; None when the stack drives the arm.
     """
 
-    def __init__(self, node: Node, *, articulation_root: str, urdf: str) -> None:
+    def __init__(
+        self, node: Node, *, articulation_root: str, urdf: str, shadow: dict | None = None
+    ) -> None:
         self.log = node.get_logger()
         self.articulation_root = articulation_root
         self.urdf = urdf
-        self.pub = node.create_publisher(JointState, 'isaac_joint_states', QOS_JOINTS)
-        node.create_subscription(JointState, 'isaac_joint_commands', self.on_command, QOS_JOINTS)
+        self.shadow = shadow is not None
+        state_topic = shadow['state_topic'] if shadow else 'isaac_joint_states'
+        command_topic = shadow['joint_states_topic'] if shadow else 'isaac_joint_commands'
+        self.pub = node.create_publisher(JointState, state_topic, QOS_JOINTS)
+        node.create_subscription(JointState, command_topic, self.on_command, QOS_JOINTS)
         #: Guards ``command``, written by the rclpy thread and read by the physics callback.
         self.lock = threading.Lock()
         self.command: dict[str, float] = {}
@@ -152,6 +161,11 @@ class Arm:
                 targets[0, self.index[name]] = value
         for follower, leader, multiplier, offset in self.mimics:
             targets[0, follower] = multiplier * targets[0, leader] + offset
+        if self.shadow and command:
+            # The twin shows where the other arm is: set there at rest, the drives holding it.
+            self.view.set_dof_positions(targets, self.articulations)
+            self.view.set_dof_velocities(np.zeros_like(targets), self.articulations)
+            positions = targets
         self.view.set_dof_position_targets(targets, self.articulations)
         q = positions[0].astype(float)
         # PhysX's velocities stay off zero on a joint its drive holds against a load: the change
@@ -252,7 +266,9 @@ def run(app, cfg: dict, stop: threading.Event) -> None:
     spin_thread = threading.Thread(target=executor.spin, name='rclpy', daemon=True)
     try:
         stage = omni.usd.get_context().get_stage()
-        cubes = world.build(stage, cfg['world'])
+        shadow = cfg['shadow'] if cfg['app']['mode'] == 'shadow' else None
+        # A twin's cubes would stand where nothing is on the real table.
+        cubes = world.build(stage, {**cfg['world'], 'cubes': []} if shadow else cfg['world'])
         r = cfg['robot']
         usd, urdf = robot.import_robot(
             Path(r['urdf']), Path(r['usd_cache']), r['packages'], r['drives']
@@ -263,9 +279,11 @@ def run(app, cfg: dict, stop: threading.Event) -> None:
         prim.GetVariantSet('Physics').SetVariantSelection(PHYSICS_VARIANTS[cfg['app']['engine']])
         app.update()
         root = find_articulation_root(stage, '/World/piper')
-        arm = Arm(node, articulation_root=root, urdf=urdf)
+        arm = Arm(node, articulation_root=root, urdf=urdf, shadow=shadow)
         truth = world.GroundTruth(node, cubes, float(cfg['world']['ground_truth_period_s']))
         camera = cfg['camera']
+        if shadow:
+            camera = {**camera, 'namespace': shadow['camera_namespace']}
         if camera['enabled']:
             body, T = robot.frame_in_body(urdf, camera['frame'])
             sensors.add_camera(
@@ -281,7 +299,9 @@ def run(app, cfg: dict, stop: threading.Event) -> None:
         def on_physics_step(dt_s: float, _context) -> None:
             started = time.perf_counter()
             t_s = SimulationManager.get_simulation_time()
-            pub_clock.publish(Clock(clock=Time(seconds=t_s).to_msg()))
+            # A twin runs beside a stack on the wall clock: its clock would confuse that stack.
+            if shadow is None:
+                pub_clock.publish(Clock(clock=Time(seconds=t_s).to_msg()))
             arm.step(dt_s, t_s)
             stats.add(time.perf_counter() - started)
 
@@ -310,7 +330,7 @@ def run(app, cfg: dict, stop: threading.Event) -> None:
         for _ in range(3):
             app.update()
         log.info(
-            f'Running: physics {physics_hz} Hz on {device} '
+            f'Running ({cfg["app"]["mode"]}): physics {physics_hz} Hz on {device} '
             f'({SimulationManager.get_active_physics_engine()}), render {render_hz} Hz, '
             f'real time {cfg["app"]["real_time"]}, articulation {root}'
         )

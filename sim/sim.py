@@ -4,8 +4,8 @@ Run inside the sim image (``scripts/run/sim.sh`` does):
 
     /isaac-sim/python.sh /piper-stack/sim/sim.py --config /piper-stack/sim/config/sim.yaml
 
-HEADLESS (true or false) and PHYSICS_ENGINE (physx or newton) override app.headless and
-app.engine. Python because Isaac Sim's scripting API is Python.
+HEADLESS (true or false), PHYSICS_ENGINE (physx or newton) and SIM_MODE (control or shadow)
+override app.headless, app.engine and app.mode. Python because Isaac Sim's scripting API is Python.
 """
 
 from __future__ import annotations
@@ -22,13 +22,15 @@ import yaml
 # Enabled before the simulator is imported: rclpy comes with the ROS 2 bridge.
 EXTENSIONS = ('isaacsim.ros2.core', 'isaacsim.ros2.bridge')
 ENGINES = ('physx', 'newton')
+MODES = ('control', 'shadow')
 
 
 def load_config(path: str) -> dict:
-    """Return sim.yaml with the HEADLESS and PHYSICS_ENGINE environment overrides applied.
+    """Return sim.yaml with the HEADLESS, PHYSICS_ENGINE and SIM_MODE overrides applied.
 
     Raises:
-        ValueError: If the engine is neither physx nor newton.
+        ValueError: If the engine is neither physx nor newton, or the mode neither control nor
+            shadow.
     """
     with open(path) as f:
         cfg = yaml.safe_load(f)
@@ -36,8 +38,12 @@ def load_config(path: str) -> dict:
         cfg['app']['headless'] = os.getenv('HEADLESS') == 'true'
     if os.getenv('PHYSICS_ENGINE'):
         cfg['app']['engine'] = os.getenv('PHYSICS_ENGINE')
+    if os.getenv('SIM_MODE'):
+        cfg['app']['mode'] = os.getenv('SIM_MODE')
     if cfg['app']['engine'] not in ENGINES:
         raise ValueError(f'app.engine {cfg["app"]["engine"]!r} is not one of {ENGINES}')
+    if cfg['app']['mode'] not in MODES:
+        raise ValueError(f'app.mode {cfg["app"]["mode"]!r} is not one of {MODES}')
     return cfg
 
 
