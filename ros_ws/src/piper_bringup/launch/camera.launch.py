@@ -23,7 +23,11 @@ CAMERA_ARGS = [
     ('device_ip', '192.168.10.200', 'Camera IP; empty opens the first camera found.'),
     ('color_resolution', '640x480', 'Colour mode: 1280x960, 640x480 or 320x240.'),
     ('depth_resolution', '640x400', 'Depth mode: 1280x800, 640x400 or 320x200.'),
-    ('frame_rate_control', 'true', 'true: cap the rate at frame_rate. false: as fast as it streams.'),
+    (
+        'frame_rate_control',
+        'true',
+        'true: cap the rate at frame_rate. false: as fast as it streams.',
+    ),
     ('frame_rate', '15.0', 'Frame rate cap in fps, 8 to 30, with frame_rate_control true.'),
     ('depth_registration_enable', 'true', 'true: depth aligned to the colour camera.'),
     ('color_point_cloud_enable', 'true', 'true: publish the coloured point cloud.'),
@@ -34,24 +38,37 @@ CAMERA_ARGS = [
 
 def generate_launch_description():
     percipio = PathJoinSubstitution(
-        [FindPackageShare('percipio_camera'), 'launch', 'percipio_camera.launch.py'])
-    return LaunchDescription([
-        *[DeclareLaunchArgument(name, default_value=default, description=description)
-          for name, default, description in CAMERA_ARGS],
-        DeclareLaunchArgument(
-            'rviz', default_value='false', choices=['true', 'false'],
-            description='true: open RViz with colour, depth and the coloured cloud.'),
-        IncludeLaunchDescription(
-            PythonLaunchDescriptionSource(percipio),
-            launch_arguments={
-                'camera_name': 'wrist_camera',
-                **{name: LaunchConfiguration(name) for name, _, _ in CAMERA_ARGS},
-            }.items(),
-        ),
-        Node(
-            package='rviz2',
-            executable='rviz2',
-            arguments=['-d', PathJoinSubstitution([FindPackageShare('piper_bringup'), 'rviz', 'camera.rviz'])],
-            condition=IfCondition(LaunchConfiguration('rviz')),
-        ),
-    ])
+        [FindPackageShare('percipio_camera'), 'launch', 'percipio_camera.launch.py']
+    )
+    return LaunchDescription(
+        [
+            *[
+                DeclareLaunchArgument(name, default_value=default, description=description)
+                for name, default, description in CAMERA_ARGS
+            ],
+            DeclareLaunchArgument(
+                'rviz',
+                default_value='false',
+                choices=['true', 'false'],
+                description='true: open RViz with colour, depth and the coloured cloud.',
+            ),
+            IncludeLaunchDescription(
+                PythonLaunchDescriptionSource(percipio),
+                launch_arguments={
+                    'camera_name': 'wrist_camera',
+                    **{name: LaunchConfiguration(name) for name, _, _ in CAMERA_ARGS},
+                }.items(),
+            ),
+            Node(
+                package='rviz2',
+                executable='rviz2',
+                arguments=[
+                    '-d',
+                    PathJoinSubstitution(
+                        [FindPackageShare('piper_bringup'), 'rviz', 'camera.rviz']
+                    ),
+                ],
+                condition=IfCondition(LaunchConfiguration('rviz')),
+            ),
+        ]
+    )
