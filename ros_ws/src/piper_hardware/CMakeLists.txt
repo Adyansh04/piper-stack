@@ -2,6 +2,7 @@ cmake_minimum_required(VERSION 3.22)
 project(piper_hardware LANGUAGES CXX)
 
 find_package(ament_cmake REQUIRED)
+find_package(piper_cmake REQUIRED)
 find_package(hardware_interface REQUIRED)
 find_package(piper_driver REQUIRED)
 find_package(pluginlib REQUIRED)
@@ -9,8 +10,7 @@ find_package(rclcpp REQUIRED)
 find_package(rclcpp_lifecycle REQUIRED)
 
 add_library(piper_hardware SHARED src/piper_system.cpp)
-target_compile_features(piper_hardware PUBLIC cxx_std_23)
-target_compile_options(piper_hardware PRIVATE -Wall -Wextra -Wpedantic -Wshadow)
+piper_target_defaults(piper_hardware)
 target_include_directories(piper_hardware PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
   $<INSTALL_INTERFACE:include/${PROJECT_NAME}>
