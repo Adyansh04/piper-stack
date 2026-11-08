@@ -5,7 +5,6 @@
 #include <chrono>
 #include <cstddef>
 #include <filesystem>
-#include <future>
 #include <memory>
 #include <set>
 #include <stdexcept>
@@ -24,8 +23,6 @@
 #include <moveit_msgs/msg/collision_object.hpp>
 #include <moveit_msgs/msg/planning_scene.hpp>
 #include <moveit_msgs/msg/planning_scene_components.hpp>
-#include <moveit_msgs/srv/apply_planning_scene.hpp>
-#include <moveit_msgs/srv/get_planning_scene.hpp>
 #include <piper_msgs/srv/allow_contacts.hpp>
 #include <piper_msgs/srv/attach_part.hpp>
 #include <rclcpp/rclcpp.hpp>
@@ -34,14 +31,14 @@
 #include <tf2_eigen/tf2_eigen.hpp>
 #include <tf2_msgs/msg/tf_message.hpp>
 
+#include "piper_skills/scene_client.hpp"
+
 namespace piper_skills
 {
 namespace
 {
 using AllowContacts = piper_msgs::srv::AllowContacts;
 using AttachPart = piper_msgs::srv::AttachPart;
-using GetPlanningScene = moveit_msgs::srv::GetPlanningScene;
-using ApplyPlanningScene = moveit_msgs::srv::ApplyPlanningScene;
 
 // The task's CAD meshes are in millimetres.
 constexpr double kMeshScale = 1e-3;
@@ -141,12 +138,9 @@ public:
             declare_parameter("poses_topic", std::string("/sim/objects")),
             rclcpp::QoS(10).reliable(),
             [this](const tf2_msgs::msg::TFMessage & msg) { onPoses(msg); });
-        // The callbacks wait for these: their answers come on a group of their own.
+        // The callbacks wait for move_group: its answers come on a group of their own.
         clients_ = create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
-        get_scene_ =
-            create_client<GetPlanningScene>("/get_planning_scene", rclcpp::ServicesQoS(), clients_);
-        apply_scene_ = create_client<ApplyPlanningScene>(
-            "/apply_planning_scene", rclcpp::ServicesQoS(), clients_);
+        scene_ = std::make_unique<SceneClient>(*this, clients_, kSceneTimeout);
         attach_srv_ = create_service<AttachPart>(
             "~/attach",
             [this](
@@ -225,10 +219,10 @@ private:
         {
             return;
         }
-        if (!apply(std::move(diff)))
+        if (const auto applied = scene_->apply(std::move(diff)); !applied)
         {
             RCLCPP_WARN_THROTTLE(
-                get_logger(), *get_clock(), 5000, "move_group did not take the parts' poses");
+                get_logger(), *get_clock(), 5000, "The parts' poses: %s", applied.error().c_str());
             return;
         }
         for (const auto & name : names)
@@ -255,10 +249,10 @@ private:
         moveit_msgs::msg::PlanningScene diff;
         diff.robot_state.is_diff = true;
         diff.robot_state.attached_collision_objects.push_back(std::move(attached));
-        if (!apply(std::move(diff)))
+        if (const auto applied = scene_->apply(std::move(diff)); !applied)
         {
             response.success = false;
-            response.message = "MoveIt did not apply the change";
+            response.message = applied.error();
             return;
         }
         if (request.attach)
@@ -284,52 +278,29 @@ private:
             return;
         }
         // The matrix goes back whole: a diff with a matrix replaces the scene's.
-        auto scene = std::make_shared<GetPlanningScene::Request>();
-        scene->components.components =
-            moveit_msgs::msg::PlanningSceneComponents::ALLOWED_COLLISION_MATRIX;
-        auto current = get_scene_->async_send_request(scene);
-        if (current.wait_for(kSceneTimeout) != std::future_status::ready)
+        const auto current =
+            scene_->get(moveit_msgs::msg::PlanningSceneComponents::ALLOWED_COLLISION_MATRIX);
+        if (!current)
         {
-            get_scene_->remove_pending_request(current);
             response.success = false;
-            response.message = "No answer from /get_planning_scene";
+            response.message = current.error();
             return;
         }
-        collision_detection::AllowedCollisionMatrix acm(
-            current.get()->scene.allowed_collision_matrix);
+        collision_detection::AllowedCollisionMatrix acm(current->allowed_collision_matrix);
         for (std::size_t i = 0; i < request.first.size(); ++i)
         {
             acm.setEntry(request.first[i], request.second[i], request.allowed);
         }
         moveit_msgs::msg::PlanningScene diff;
         acm.getMessage(diff.allowed_collision_matrix);
-        if (!apply(std::move(diff)))
+        if (const auto applied = scene_->apply(std::move(diff)); !applied)
         {
             response.success = false;
-            response.message = "MoveIt did not apply the allowed collisions";
+            response.message = applied.error();
             return;
         }
         response.success = true;
         response.message = request.allowed ? "Allowed" : "Forbidden";
-    }
-
-    /// @brief Applies a diff to move_group's scene; false if move_group is not up or refuses it.
-    bool apply(moveit_msgs::msg::PlanningScene diff)
-    {
-        if (!apply_scene_->service_is_ready())
-        {
-            return false;
-        }
-        auto request = std::make_shared<ApplyPlanningScene::Request>();
-        request->scene = std::move(diff);
-        request->scene.is_diff = true;
-        auto reply = apply_scene_->async_send_request(request);
-        if (reply.wait_for(kSceneTimeout) != std::future_status::ready)
-        {
-            apply_scene_->remove_pending_request(reply);
-            return false;
-        }
-        return reply.get()->success;
     }
 
     std::unordered_map<std::string, std::vector<shape_msgs::msg::Mesh>> parts_;
@@ -344,8 +315,7 @@ private:
     std::set<std::string> attached_;
     rclcpp::Subscription<tf2_msgs::msg::TFMessage>::SharedPtr poses_sub_;
     rclcpp::CallbackGroup::SharedPtr clients_;
-    rclcpp::Client<GetPlanningScene>::SharedPtr get_scene_;
-    rclcpp::Client<ApplyPlanningScene>::SharedPtr apply_scene_;
+    std::unique_ptr<SceneClient> scene_;
     rclcpp::Service<AttachPart>::SharedPtr attach_srv_;
     rclcpp::Service<AllowContacts>::SharedPtr allow_srv_;
     rclcpp::TimerBase::SharedPtr timer_;

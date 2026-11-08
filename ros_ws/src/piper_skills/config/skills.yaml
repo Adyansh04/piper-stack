@@ -161,3 +161,34 @@
       # camera come down beside the gripper, metres.
       wrist_above_m: 0.25
       wrist_radius_m: 0.08
+
+    # The stages of a contact task (run_stage), its parts kept in MoveIt's scene by task_scene.
+    task:
+      # The task's task.yaml (tasks/<task>/task.yaml): set by the launch file's task_file
+      # argument; empty, run_stage refuses every goal.
+      file: ""
+      # The node whose attach and allow_contacts services keep the task's parts in MoveIt's scene.
+      scene_node: "/task_scene"
+      # Speed scalings, 0 to 1 of Pilz's Cartesian limits (pilz_cartesian_limits.yaml), of the
+      # moves onto the mate (0.1: 10 mm/s) and of the screw's and twist's turns (0.6: 0.3 rad/s).
+      insert_velocity_scale: 0.1
+      turn_velocity_scale: 0.6
+      # A finger stopping at or below this travel holds nothing, metres: 1 mm, as the simulator's
+      # soft finger contacts let a part sink about 2 mm into each pad (the 8 mm pin reads 2 mm).
+      held_min_m: 0.001
+      # Once the fingers stop on a part they are sent this much further in, metres: 3 mm at the
+      # sim's 2000 N/m finger drives is a 6 N squeeze, under their 10 N limit, so both fingers keep
+      # pushing and hold the part centred (saturated, the pair drifts sideways with the part).
+      squeeze_m: 0.003
+      # The largest turn of one straight move: Pilz turns the shorter way, so under half a turn.
+      max_turn_step_deg: 90.0
+      # The joint that turns the TCP about its z; a screw lets go and turns it back half a turn
+      # this far from its limits, radians.
+      wrist_joint: "joint6"
+      wrist_margin_rad: 0.15
+      # A released part settles this long before its pose is checked, seconds, and may end this
+      # far from its goal: metres, and degrees of tilt or of turn (the collar's thread play turns
+      # it up to about 17 degrees about where it seats).
+      settle_s: 1.0
+      goal_tolerance_m: 0.003
+      goal_tolerance_deg: 20.0

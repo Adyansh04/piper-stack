@@ -7,6 +7,7 @@
 #include <exception>
 #include <expected>
 #include <format>
+#include <fstream>
 #include <functional>
 #include <future>
 #include <map>
@@ -14,6 +15,7 @@
 #include <mutex>
 #include <numbers>
 #include <optional>
+#include <sstream>
 #include <stdexcept>
 #include <string>
 #include <thread>
@@ -26,11 +28,13 @@
 #include <geometry_msgs/msg/pose_stamped.hpp>
 #include <moveit_msgs/msg/attached_collision_object.hpp>
 #include <moveit_msgs/msg/collision_object.hpp>
+#include <moveit_msgs/msg/planning_scene.hpp>
 #include <opencv2/core.hpp>
 #include <piper_msgs/action/find_objects.hpp>
 #include <piper_msgs/action/move_arm_to_named_pose.hpp>
 #include <piper_msgs/action/pick_object.hpp>
 #include <piper_msgs/action/place_object.hpp>
+#include <piper_msgs/action/run_stage.hpp>
 #include <piper_msgs/action/view_workspace.hpp>
 #include <piper_msgs/msg/detected_object.hpp>
 #include <piper_msgs/srv/compute_grasps.hpp>
@@ -54,7 +58,10 @@
 #include "piper_skills/object_cloud.hpp"
 #include "piper_skills/place_geometry.hpp"
 #include "piper_skills/place_target.hpp"
+#include "piper_skills/scene_client.hpp"
 #include "piper_skills/srdf_states.hpp"
+#include "piper_skills/stage_runner.hpp"
+#include "piper_skills/task_stages.hpp"
 #include "piper_skills/view_planner.hpp"
 
 namespace piper_skills
@@ -121,8 +128,9 @@ constexpr const char * kTableId = "table";
 /**
  * @class SkillsNode
  * @brief The Piper's manipulation skills on one table, as actions.
- * @details Offers `move_arm_to_named_pose`, `view_workspace`, `find_objects`, `pick_object` and
- * `place_object` (piper_msgs actions) and the `place_target` service. One skill runs at a time: a
+ * @details Offers `move_arm_to_named_pose`, `view_workspace`, `find_objects`, `pick_object`,
+ * `place_object` and, with a task (`task.file`), `run_stage` (piper_msgs actions) and the
+ * `place_target` service. One skill runs at a time: a
  * goal that comes while one runs is rejected. A skill runs on a thread of its own and checks for a
  * cancel between its steps; a cancel also stops the arm's move. Objects are found by name through
  * `segment_objects` (SAM 3.1) and grasped with `compute_grasps` (GraspGenX).
@@ -149,6 +157,13 @@ public:
             segment_service_, rclcpp::ServicesQoS(), clients_group_);
         grasp_client_ = create_client<piper_msgs::srv::ComputeGrasps>(
             grasp_service_, rclcpp::ServicesQoS(), clients_group_);
+        scene_ =
+            std::make_shared<SceneClient>(*this, clients_group_, motion_settings_.service_wait);
+        if (!task_stages_.empty())
+        {
+            stage_runner_ = std::make_unique<StageRunner>(
+                *this, clients_group_, scene_, std::move(task_stages_), stage_settings_);
+        }
         offerSkills();
         RCLCPP_INFO(
             get_logger(),
@@ -340,6 +355,37 @@ private:
         free_.wrist_radius_m = param<double>("place.wrist_radius_m", 0.08);
         free_.min_depth_m = cloud_.min_depth_m;
         free_.max_depth_m = cloud_.max_depth_m;
+
+        const auto task_file = param<std::string>("task.file", "");
+        auto & t = stage_settings_;
+        t.scene_node = param<std::string>("task.scene_node", "/task_scene");
+        t.touch_links = touch_links_;
+        t.closed_m = gripper_closed_m_;
+        t.effort = gripper_effort_;
+        t.held_min_m = param<double>("task.held_min_m", 0.001);
+        t.squeeze_m = param<double>("task.squeeze_m", 0.003);
+        t.pregrasp_m = pregrasp_m_;
+        t.lift_m = lift_m_;
+        t.insert_velocity_scale = param<double>("task.insert_velocity_scale", 0.1);
+        t.turn_velocity_scale = param<double>("task.turn_velocity_scale", 0.6);
+        t.max_turn_step_rad = degToRad(param<double>("task.max_turn_step_deg", 90.0));
+        t.wrist_joint = param<std::string>("task.wrist_joint", "joint6");
+        t.wrist_margin_rad = param<double>("task.wrist_margin_rad", 0.15);
+        t.settle = msOf(param<double>("task.settle_s", 1.0));
+        t.goal_tolerance_m = param<double>("task.goal_tolerance_m", 0.003);
+        t.goal_tolerance_rad = degToRad(param<double>("task.goal_tolerance_deg", 20.0));
+        t.service_timeout = motion_settings_.service_wait;
+        if (!task_file.empty())
+        {
+            const std::ifstream file(task_file);
+            if (!file)
+            {
+                throw std::invalid_argument(std::format("task.file {} does not open", task_file));
+            }
+            std::stringstream text;
+            text << file.rdbuf();
+            task_stages_ = parseStages(text.str());
+        }
     }
 
     Eigen::Vector2d xyParam(const std::string & name, const std::vector<double> & fallback)
@@ -470,6 +516,9 @@ private:
         place_server_ = serve<piper_msgs::action::PlaceObject>(
             "place_object",
             [this](const auto & goal, auto & result) { return runPlace(goal, result); });
+        stage_server_ = serve<piper_msgs::action::RunStage>(
+            "run_stage",
+            [this](const auto & goal, auto & result) { return runStage(goal, result); });
         place_target_service_ = create_service<piper_msgs::srv::PlaceTarget>(
             "place_target",
             [this](
@@ -510,7 +559,9 @@ private:
             top_.center.z() - table_thickness_m_ / 2.0 - 0.001);
         table.primitive_poses.push_back(tf2::toMsg(pose));
         table.operation = moveit_msgs::msg::CollisionObject::ADD;
-        motion_->scene().applyCollisionObject(table);
+        moveit_msgs::msg::PlanningScene diff;
+        diff.world.collision_objects.push_back(std::move(table));
+        warnIfFailed(scene_->apply(std::move(diff)), "Adding the table");
     }
 
     void attachHeld(const Eigen::Vector3d & centre_in_tcp, const Eigen::Vector3d & size_m)
@@ -532,7 +583,10 @@ private:
         pose.translation() = centre_in_tcp;
         object.primitive_poses.push_back(tf2::toMsg(pose));
         object.operation = moveit_msgs::msg::CollisionObject::ADD;
-        motion_->scene().applyAttachedCollisionObject(attached);
+        moveit_msgs::msg::PlanningScene diff;
+        diff.robot_state.is_diff = true;
+        diff.robot_state.attached_collision_objects.push_back(std::move(attached));
+        warnIfFailed(scene_->apply(std::move(diff)), "Attaching the held object");
     }
 
     void detachHeld()
@@ -541,12 +595,16 @@ private:
         attached.link_name = motion_settings_.tcp_link;
         attached.object.id = kHeldId;
         attached.object.operation = moveit_msgs::msg::CollisionObject::REMOVE;
-        motion_->scene().applyAttachedCollisionObject(attached);
+        // Detached, the object would stay in the world where it was let go: remove it there too.
         moveit_msgs::msg::CollisionObject gone;
         gone.id = kHeldId;
         gone.header.frame_id = planning_frame_;
         gone.operation = moveit_msgs::msg::CollisionObject::REMOVE;
-        motion_->scene().applyCollisionObject(gone);
+        moveit_msgs::msg::PlanningScene diff;
+        diff.robot_state.is_diff = true;
+        diff.robot_state.attached_collision_objects.push_back(std::move(attached));
+        diff.world.collision_objects.push_back(std::move(gone));
+        warnIfFailed(scene_->apply(std::move(diff)), "Letting go of the held object");
         held_.reset();
     }
 
@@ -1400,6 +1458,29 @@ private:
         return std::unexpected(why);
     }
 
+    Status runStage(
+        const std::shared_ptr<Handle<piper_msgs::action::RunStage>> & goal,
+        piper_msgs::action::RunStage::Result & result)
+    {
+        if (!stage_runner_)
+        {
+            return std::unexpected("no task: start the skills with task.file (task_file:=...)");
+        }
+        auto feedback = std::make_shared<piper_msgs::action::RunStage::Feedback>();
+        const auto phase = [&](const char * name) {
+            feedback->phase = name;
+            goal->publish_feedback(feedback);
+        };
+        const auto ended = stage_runner_->run(
+            *motion_, goal->get_goal()->stage, phase, [this] { return cancel_.load(); });
+        if (!ended)
+        {
+            return std::unexpected(ended.error());
+        }
+        result.goal_error_m = *ended;
+        return {};
+    }
+
     void answerPlaceTarget(
         const piper_msgs::srv::PlaceTarget::Request & request,
         piper_msgs::srv::PlaceTarget::Response & response)
@@ -1461,6 +1542,7 @@ private:
     rclcpp_action::Server<piper_msgs::action::FindObjects>::SharedPtr find_server_;
     rclcpp_action::Server<piper_msgs::action::PickObject>::SharedPtr pick_server_;
     rclcpp_action::Server<piper_msgs::action::PlaceObject>::SharedPtr place_server_;
+    rclcpp_action::Server<piper_msgs::action::RunStage>::SharedPtr stage_server_;
     rclcpp::Service<piper_msgs::srv::PlaceTarget>::SharedPtr place_target_service_;
     std::atomic<bool> busy_{false};
     std::atomic<bool> cancel_{false};
@@ -1510,6 +1592,12 @@ private:
     double clear_above_m_{0.05};
     double place_tolerance_m_{0.05};
     FreeSpotOptions free_;
+    // The task's stages, read with the parameters and handed to the runner.
+    std::vector<Stage> task_stages_;
+    StageSettings stage_settings_;
+    std::unique_ptr<StageRunner> stage_runner_;
+    // MoveIt's planning scene: the table, a held object and a task's parts.
+    std::shared_ptr<SceneClient> scene_;
 };
 
 }  // namespace piper_skills

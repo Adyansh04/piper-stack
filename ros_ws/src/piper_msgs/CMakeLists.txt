@@ -13,6 +13,7 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "action/MoveArmToNamedPose.action"
   "action/PickObject.action"
   "action/PlaceObject.action"
+  "action/RunStage.action"
   "action/RunTree.action"
   "action/ViewWorkspace.action"
   "msg/BlackboardEntry.msg"

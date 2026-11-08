@@ -1,13 +1,19 @@
 #include "piper_skills/arm_motion.hpp"
 
 #include <algorithm>
+#include <atomic>
+#include <chrono>
+#include <condition_variable>
 #include <cstddef>
 #include <expected>
 #include <format>
 #include <future>
 #include <memory>
+#include <mutex>
 #include <optional>
+#include <stop_token>
 #include <string>
+#include <thread>
 #include <utility>
 #include <vector>
 
@@ -27,6 +33,10 @@ namespace
 // The move_group servers must be up when a skill first moves; the skills node starts with the
 // stack, so this only waits out move_group's own start.
 constexpr double kServerWaitS = 30.0;
+// A move still running at this many times its planned duration, plus the margin, is stopped: a
+// jammed arm (a part stuck on its mate) must fail its move rather than wait for ever.
+constexpr double kMoveTimeScale = 2.0;
+constexpr double kMoveMarginS = 10.0;
 
 }  // namespace
 
@@ -63,7 +73,30 @@ std::expected<void, std::string> ArmMotion::planAndRun(const char * what)
             std::format(
                 "{}: planning failed ({})", what, moveit::core::errorCodeToString(planned)));
     }
-    const moveit::core::MoveItErrorCode ran = group_.execute(plan);
+    const auto & points = plan.trajectory.joint_trajectory.points;
+    const double planned_s =
+        points.empty() ? 0.0 : rclcpp::Duration(points.back().time_from_start).seconds();
+    const std::chrono::duration<double> limit(kMoveTimeScale * planned_s + kMoveMarginS);
+    std::atomic<bool> timed_out{false};
+    moveit::core::MoveItErrorCode ran;
+    {
+        const std::jthread watchdog([this, limit, &timed_out](const std::stop_token & token) {
+            std::mutex mutex;
+            std::condition_variable_any done;
+            std::unique_lock lock(mutex);
+            if (!done.wait_for(lock, token, limit, [] { return false; }) && !token.stop_requested())
+            {
+                timed_out.store(true);
+                group_.stop();
+            }
+        });
+        ran = group_.execute(plan);
+    }
+    if (timed_out.load())
+    {
+        return std::unexpected(
+            std::format("{}: still moving after {:.0f} s, stopped", what, limit.count()));
+    }
     if (ran != moveit::core::MoveItErrorCode::SUCCESS)
     {
         return std::unexpected(
@@ -206,6 +239,32 @@ Eigen::Isometry3d ArmMotion::tcpPose()
     Eigen::Isometry3d pose;
     tf2::fromMsg(group_.getCurrentPose(settings_.tcp_link).pose, pose);
     return pose;
+}
+
+std::optional<JointValues> ArmMotion::joints()
+{
+    const moveit::core::RobotStatePtr state = group_.getCurrentState(1.0);
+    if (!state)
+    {
+        return std::nullopt;
+    }
+    JointValues out;
+    for (const auto & name : group_.getJointNames())
+    {
+        out[name] = state->getVariablePosition(name);
+    }
+    return out;
+}
+
+std::optional<std::pair<double, double>> ArmMotion::jointLimits(const std::string & joint) const
+{
+    const moveit::core::RobotModelConstPtr model = group_.getRobotModel();
+    if (!model || !model->hasJointModel(joint))
+    {
+        return std::nullopt;
+    }
+    const moveit::core::VariableBounds & bounds = model->getVariableBounds(joint);
+    return std::pair{bounds.min_position_, bounds.max_position_};
 }
 
 void ArmMotion::stop()

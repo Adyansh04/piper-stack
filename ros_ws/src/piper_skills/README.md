@@ -28,6 +28,7 @@ the stack).
 | `pick_object` | `piper_msgs/action/PickObject` | Finds the best match of a prompt, asks GraspGenX for grasps, ranks and tries them |
 | `place_object` | `piper_msgs/action/PlaceObject` | Puts the held object on a free spot: in a region (`free`), at `relative` (-1 to 1) or `metric` coordinates, or next to an `anchor` object |
 | `place_target` | `piper_msgs/srv/PlaceTarget` | Where a place goal's target lies, and whether the arm reaches above it |
+| `run_stage` | `piper_msgs/action/RunStage` | Runs one stage of a contact task (`task.file`): grasps its part, puts it on its mate, screws or twists it home (below) |
 
 One skill runs at a time: a goal sent while one runs is rejected. A cancel stops the arm's move
 and ends the skill between its steps. Picks and places report their phase (`finding`,
@@ -65,6 +66,31 @@ A stage that mates two parts allows their contact for its duration: MoveIt Servo
 before a contact the matrix forbids. `bringup.launch.py task_file:=...` starts the node with the
 stack; its parameters are in `config/task_scene.yaml`.
 
+## Task stages
+
+Started with the same task (`skills.launch.py task_file:=...`), the skills run the stages of its
+`task.yaml` (see [tasks/README.md](../../../tasks/README.md)) through `run_stage`:
+
+```bash
+ros2 action send_goal --feedback /run_stage piper_msgs/action/RunStage "{stage: ring}"
+```
+
+A stage takes its part where MoveIt's scene has it and grasps it with the grasp (of the part's
+symmetry) that the arm reaches both there and above the part's mate. It lifts the part (attached
+in the scene), brings it above its mate and down in a straight line (Pilz LIN at
+`task.insert_velocity_scale`), then:
+
+- `insert`: lets go where the goal is.
+- `screw`: turns the part down its thread in straight moves of at most `task.max_turn_step_deg`;
+  when `joint6` comes within `task.wrist_margin_rad` of its limit the fingers let go, the wrist
+  turns back half a turn and the fingers close on the part's flats again.
+- `twist`: turns the part in place by the stage's twist.
+
+The fingers then open, the arm rises and the part's pose in the scene is checked against its
+goal (`task.goal_tolerance_m`, `task.goal_tolerance_deg`). The fingers may touch the part, and the
+stage's contacts are allowed, only while the stage runs. The part's goal and the path to it come
+from the task, its pose and its mate's from the scene: ground truth in the simulator.
+
 ## How a pick works
 
 1. Look at the table from the first view that shows the prompt; turn each mask into the object's
@@ -96,6 +122,8 @@ All in `config/skills.yaml`, with units and reasons. The ones to know:
 - `pick.*`, `place.*`: approach and lift heights, and `place.max_reach_m`, beyond which the arm
   cannot come down from above (with the gripper straight down it reaches 0.08 to 0.12 m above the
   top within 0.33 m of its base).
+- `task.*`: the contact task (`task.file`), the speeds of its insertions and turns, the wrist's
+  margin before a screw regrasps, and how far a stage's part may end from its goal.
 
 ## Tests
 
@@ -104,4 +132,5 @@ All in `config/skills.yaml`, with units and reasons. The ones to know:
 ```
 
 `test_skills_core` covers the geometry without ROS: grasp ranking, object clouds, free spots, place
-targets, view planning and SRDF states.
+targets, view planning, SRDF states and a task's stages (parsing, grasps, the screw's and twist's
+paths).

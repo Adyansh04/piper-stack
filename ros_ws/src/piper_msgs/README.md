@@ -35,6 +35,7 @@ field says otherwise.
 | `FindObjects` | `piper_skills` | Looks for a prompt view by view |
 | `PickObject` | `piper_skills` | Finds, grasps and lifts an object |
 | `PlaceObject` | `piper_skills` | Puts the held object on a free spot or at a target |
+| `RunStage` | `piper_skills` | Runs one stage of a contact task: grasps its part and screws, twists or inserts it home |
 | `RunTree` | `piper_bt` | Runs one behaviour tree to its end |
 
 Each file's comments give the fields' units and meanings.

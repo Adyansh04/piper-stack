@@ -7,11 +7,11 @@
 #include <memory>
 #include <optional>
 #include <string>
+#include <utility>
 
 #include <Eigen/Geometry>
 #include <control_msgs/action/parallel_gripper_command.hpp>
 #include <moveit/move_group_interface/move_group_interface.hpp>
-#include <moveit/planning_scene_interface/planning_scene_interface.hpp>
 #include <moveit_msgs/srv/get_position_ik.hpp>
 #include <rclcpp/rclcpp.hpp>
 #include <rclcpp_action/rclcpp_action.hpp>
@@ -132,6 +132,20 @@ public:
     [[nodiscard]] Eigen::Isometry3d tcpPose();
 
     /**
+     * @brief The group's joint positions now, from the robot's current state.
+     * @return Positions by joint name, or nullopt when no current state comes within a second.
+     */
+    [[nodiscard]] std::optional<JointValues> joints();
+
+    /**
+     * @brief A joint's position limits, from the robot model.
+     * @param[in] joint The joint's name.
+     * @return The lower and upper limit, radians or metres; nullopt for a joint the model lacks.
+     */
+    [[nodiscard]] std::optional<std::pair<double, double>> jointLimits(
+        const std::string & joint) const;
+
+    /**
      * @brief Stops a move in progress; the blocked call, and the next one, return a failure.
      */
     void stop();
@@ -141,21 +155,12 @@ public:
      */
     void clearStop();
 
-    /**
-     * @brief The planning scene, for collision objects and attached loads.
-     */
-    [[nodiscard]] moveit::planning_interface::PlanningSceneInterface & scene()
-    {
-        return scene_;
-    }
-
 private:
     [[nodiscard]] std::expected<void, std::string> planAndRun(const char * what);
 
     rclcpp::Node::SharedPtr node_;
     MotionSettings settings_;
     moveit::planning_interface::MoveGroupInterface group_;
-    moveit::planning_interface::PlanningSceneInterface scene_;
     rclcpp::Client<moveit_msgs::srv::GetPositionIK>::SharedPtr ik_client_;
     rclcpp_action::Client<control_msgs::action::ParallelGripperCommand>::SharedPtr gripper_client_;
     std::atomic<bool> stopped_{false};

@@ -11,6 +11,7 @@ find_package(piper_cmake REQUIRED)
 find_package(Eigen3 REQUIRED)
 find_package(OpenCV REQUIRED COMPONENTS core imgproc)
 find_package(tinyxml2 REQUIRED)
+find_package(yaml-cpp REQUIRED)
 
 # The skills' geometry: plain C++ with no ROS, unit-tested on its own.
 add_library(piper_skills_core SHARED
@@ -19,6 +20,7 @@ add_library(piper_skills_core SHARED
   src/place_geometry.cpp
   src/place_target.cpp
   src/srdf_states.cpp
+  src/task_stages.cpp
   src/view_planner.cpp
 )
 target_include_directories(piper_skills_core PUBLIC
@@ -27,7 +29,7 @@ target_include_directories(piper_skills_core PUBLIC
 )
 target_link_libraries(piper_skills_core
   PUBLIC Eigen3::Eigen opencv_core
-  PRIVATE opencv_imgproc tinyxml2::tinyxml2
+  PRIVATE opencv_imgproc tinyxml2::tinyxml2 yaml-cpp::yaml-cpp
 )
 piper_target_defaults(piper_skills_core)
 install(TARGETS piper_skills_core
@@ -53,19 +55,19 @@ find_package(tf2_ros REQUIRED)
 find_package(geometric_shapes REQUIRED)
 find_package(moveit_core REQUIRED)
 find_package(tf2_msgs REQUIRED)
-find_package(yaml-cpp REQUIRED)
 
 # A plugin loaded by the component container or the generated executable: nothing links it.
 add_library(skills_component SHARED
   src/arm_motion.cpp
   src/camera_capture.cpp
+  src/scene_client.cpp
   src/skills_node.cpp
+  src/stage_runner.cpp
 )
 target_link_libraries(skills_component PRIVATE
   piper_skills_core
   cv_bridge::cv_bridge
   moveit_ros_planning_interface::moveit_move_group_interface
-  moveit_ros_planning_interface::moveit_planning_scene_interface
   rclcpp::rclcpp
   rclcpp_action::rclcpp_action
   rclcpp_components::component
@@ -92,7 +94,8 @@ install(TARGETS skills_component
 )
 
 # A task's parts in MoveIt's planning scene.
-add_library(task_scene_component SHARED src/task_scene.cpp)
+add_library(task_scene_component SHARED src/scene_client.cpp src/task_scene.cpp)
+target_include_directories(task_scene_component PRIVATE include)
 target_link_libraries(task_scene_component PRIVATE
   geometric_shapes::geometric_shapes
   moveit_core::moveit_collision_detection
@@ -122,7 +125,8 @@ install(DIRECTORY config launch DESTINATION share/${PROJECT_NAME})
 
 if(BUILD_TESTING)
   find_package(ament_cmake_gtest REQUIRED)
-  ament_add_gtest(test_skills_core test/test_core.cpp test/test_place_target.cpp)
+  ament_add_gtest(test_skills_core
+    test/test_core.cpp test/test_place_target.cpp test/test_task_stages.cpp)
   target_link_libraries(test_skills_core piper_skills_core opencv_imgproc)
   piper_target_defaults(test_skills_core)
 endif()

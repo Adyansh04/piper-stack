@@ -1,0 +1,16 @@
+# Run one stage of the task the skills were started with (task.file, its task.yaml's stages): take
+# the stage's part where MoveIt's scene has it, bring it down onto its mate, screw or twist it home
+# as the stage says, let go and check how far from its goal it ended.
+
+# The stage's name, e.g. "ring".
+string stage
+---
+bool success
+string message
+
+# How far the part ended from its goal, metres; valid when success is true.
+float64 goal_error_m
+---
+# "locating", "grasping", "lifting", "approaching", "inserting", "screwing", "regrasping",
+# "twisting", "releasing", "retreating", "checking"
+string phase

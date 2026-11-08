@@ -3,6 +3,9 @@
 Needs the stack (piper_bringup with moveit:=true), segment_objects and compute_grasps:
     ros2 launch piper_skills skills.launch.py
     ros2 launch piper_skills skills.launch.py use_sim_time:=true   # against Isaac Sim
+With a contact task's stages (run_stage; bringup's task_file starts task_scene):
+    ros2 launch piper_skills skills.launch.py use_sim_time:=true \
+        task_file:=/piper-stack/tasks/assembly/task.yaml
 """
 
 import os
@@ -47,20 +50,30 @@ def generate_launch_description() -> LaunchDescription:
                 description="The skills' parameter YAML. Default: this package's "
                 'config/skills.yaml.',
             ),
+            DeclareLaunchArgument(
+                'task_file',
+                default_value='',
+                description="A contact task's task.yaml (tasks/<task>/task.yaml), whose stages "
+                "run_stage runs; the stack must keep its parts in MoveIt's scene (bringup's "
+                'task_file). Empty: no stages.',
+            ),
             Node(
                 package='piper_skills',
                 executable='skills_node',
                 name='piper_skills',
+                # The node's own file first: rclcpp applies parameter sections in the order it first
+                # meets them, so the launch's values below (for every node) override the file's.
                 parameters=[
+                    LaunchConfiguration('config'),
                     moveit.robot_description,
                     moveit.robot_description_semantic,
                     moveit.robot_description_kinematics,
                     moveit.joint_limits,
-                    LaunchConfiguration('config'),
                     {
+                        'task.file': LaunchConfiguration('task_file'),
                         'use_sim_time': ParameterValue(
                             LaunchConfiguration('use_sim_time'), value_type=bool
-                        )
+                        ),
                     },
                 ],
                 output='screen',
