@@ -50,6 +50,10 @@ find_package(sensor_msgs REQUIRED)
 find_package(shape_msgs REQUIRED)
 find_package(tf2_eigen REQUIRED)
 find_package(tf2_ros REQUIRED)
+find_package(geometric_shapes REQUIRED)
+find_package(moveit_core REQUIRED)
+find_package(tf2_msgs REQUIRED)
+find_package(yaml-cpp REQUIRED)
 
 # A plugin loaded by the component container or the generated executable: nothing links it.
 add_library(skills_component SHARED
@@ -82,6 +86,32 @@ rclcpp_components_register_node(skills_component
   EXECUTOR MultiThreadedExecutor
 )
 install(TARGETS skills_component
+  ARCHIVE DESTINATION lib
+  LIBRARY DESTINATION lib
+  RUNTIME DESTINATION bin
+)
+
+# A task's parts in MoveIt's planning scene.
+add_library(task_scene_component SHARED src/task_scene.cpp)
+target_link_libraries(task_scene_component PRIVATE
+  geometric_shapes::geometric_shapes
+  moveit_core::moveit_collision_detection
+  rclcpp::rclcpp
+  rclcpp_components::component
+  tf2_eigen::tf2_eigen
+  yaml-cpp::yaml-cpp
+  ${moveit_msgs_TARGETS}
+  ${piper_msgs_TARGETS}
+  ${shape_msgs_TARGETS}
+  ${tf2_msgs_TARGETS}
+)
+piper_target_defaults(task_scene_component)
+rclcpp_components_register_node(task_scene_component
+  PLUGIN "piper_skills::TaskScene"
+  EXECUTABLE task_scene
+  EXECUTOR MultiThreadedExecutor
+)
+install(TARGETS task_scene_component
   ARCHIVE DESTINATION lib
   LIBRARY DESTINATION lib
   RUNTIME DESTINATION bin

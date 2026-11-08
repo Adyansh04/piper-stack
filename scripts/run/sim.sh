@@ -16,14 +16,15 @@
 # The simulator runs headless in the sim container (docker compose --profile sim); its first start
 # compiles shaders for minutes. HEADLESS=false opens Isaac Sim's window, PHYSICS_ENGINE=newton
 # runs Newton (the contact tasks' threads and connector need it), TASK=<name> puts a task's parts
-# (tasks/<name>) on the table instead of the cubes, LIVESTREAM=true streams Isaac Sim's UI over
-# WebRTC (for a simulator on another machine: NVIDIA's Isaac Sim WebRTC Streaming Client, 49100/tcp
-# and 47998/udp). name:=value arguments go to the bringup launch. --print lists the commands.
+# (tasks/<name>) on the table instead of the cubes and, with MoveIt, in its planning scene,
+# LIVESTREAM=true streams Isaac Sim's UI over WebRTC (for a simulator on another machine: NVIDIA's
+# Isaac Sim WebRTC Streaming Client, 49100/tcp and 47998/udp). name:=value arguments go to the
+# bringup launch. --print lists the commands.
 # shellcheck source=../lib/panes.sh
 source "$(dirname "$0")/../lib/panes.sh"
 parse_args "$@"
 
-readonly BRINGUP="ros2 launch piper_bringup bringup.launch.py hardware:=isaac"
+readonly BRINGUP="ros2 launch piper_bringup bringup.launch.py hardware:=isaac${TASK:+ task_file:=/piper-stack/tasks/${TASK}/task.yaml}"
 # shellcheck disable=SC2016 # expanded in the keyboard pane, inside the container
 # On the simulator's clock: Servo drops a jog once its stamp is old, which a wall-clock stamp never is.
 readonly JOG='ros2 run piper_teleop keyboard_jog --ros-args --params-file "$(ros2 pkg prefix piper_teleop)/share/piper_teleop/config/keyboard_jog.yaml" -p use_sim_time:=true'

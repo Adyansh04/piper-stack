@@ -35,6 +35,8 @@ variants with `--help`, and `--print` lists the commands instead of opening them
 - `policy`: a trained reach policy (`policy.onnx`) for `piper_controllers`' policy runner, which
   moves the arm through MoveIt Servo (needs `moveit:=true servo:=true`); it starts inactive (see
   its README).
+- `task_file`: a task's `tasks/<task>/task.yaml`; `piper_skills`' `task_scene` keeps its parts in
+  MoveIt's planning scene at the poses on `/sim/objects` (needs `moveit:=true`).
 
 ## Recording
 

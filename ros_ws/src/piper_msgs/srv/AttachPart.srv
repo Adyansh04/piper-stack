@@ -1,0 +1,7 @@
+# Attach a task part to the gripper in MoveIt's scene (it moves with the tool and may touch the
+# fingers), or put it back in the world where it is.
+string part
+bool attach
+---
+bool success
+string message

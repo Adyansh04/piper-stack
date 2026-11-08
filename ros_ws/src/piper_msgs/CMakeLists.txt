@@ -21,6 +21,8 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "msg/Segment.msg"
   "msg/TreeNodeStatus.msg"
   "msg/TreeStatus.msg"
+  "srv/AllowContacts.srv"
+  "srv/AttachPart.srv"
   "srv/ComputeGrasps.srv"
   "srv/ControlTree.srv"
   "srv/PlaceTarget.srv"

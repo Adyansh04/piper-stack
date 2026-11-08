@@ -1,7 +1,7 @@
 # piper_msgs
 
-The stack's own interfaces: perception, the pick and place skills, and the behaviour tree
-executor. Poses are in the planning frame (`world`, the robot's base at the table top) unless a
+The stack's own interfaces: perception, the pick and place skills, the contact tasks' planning
+scene and the behaviour tree executor. Poses are in the planning frame (`world`, the robot's base at the table top) unless a
 field says otherwise.
 
 ## Messages
@@ -22,6 +22,8 @@ field says otherwise.
 | `SegmentObjects` | `piper_perception` (`sam3_segmentation`) | Instance masks of an image for text prompts |
 | `ComputeGrasps` | `piper_perception` (`grasp_generation`) | Ranked grasps for an object's points |
 | `PlaceTarget` | `piper_skills` | Where a place target lies on the table, and whether the arm reaches it |
+| `AttachPart` | `piper_skills` (`task_scene`) | Attaches a task part to the gripper in MoveIt's scene, or detaches it |
+| `AllowContacts` | `piper_skills` (`task_scene`) | Allows or forbids contacts between pairs of parts or links in MoveIt's scene |
 | `ControlTree` | `piper_bt` | Pause, hold or resume the running tree |
 
 ## Actions

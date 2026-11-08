@@ -43,7 +43,8 @@ Environment variables before the command:
   solver steps per physics step) instead of PhysX. The contact tasks need it: their threads and the
   USB-C fit collide through each mesh's signed distance field.
 - `TASK=assembly` (or another folder under `tasks/`): that task's parts on the table at their start
-  poses instead of the cubes ([tasks/README.md](../../tasks/README.md)).
+  poses instead of the cubes ([tasks/README.md](../../tasks/README.md)). With MoveIt, the run
+  script also starts `piper_skills`' `task_scene`, which puts the parts in MoveIt's planning scene.
 
 `sim/config/sim.yaml` holds the rates, the world (table, cubes and their friction, the task), the
 cameras, Newton's solver settings and the joint drives, with a comment on each value.
@@ -56,5 +57,6 @@ cameras, Newton's solver settings and the joint drives, with a comment on each v
 - `/overhead_camera/color/image_raw` and its `camera_info` (1280 x 720, 70 degree field of view),
   as a USB camera driver names them: the overhead RGB camera, 1 m above the table looking down, in
   `overhead_camera_color_optical_frame` (the robot description holds its pose).
-- `/sim/objects`: the cubes' or the task parts' poses in `world` (TFMessage), the ground truth for
-  tests and for scripted experts.
+- `/sim/objects`: the cubes' or the task parts' poses in `world` (TFMessage, the child frame is the
+  object's name), every 0.5 s of simulation time, static parts (a task's fixture) included: the
+  ground truth for tests, scripted experts and MoveIt's planning scene.

@@ -8,6 +8,9 @@ Without the arm, planning and jogging in RViz:
     ros2 launch piper_bringup bringup.launch.py hardware:=mock motion:=true moveit:=true rviz:=true
 Against Isaac Sim (sim/sim.py running), on its clock:
     ros2 launch piper_bringup bringup.launch.py hardware:=isaac motion:=true moveit:=true
+With a task's parts in MoveIt's planning scene (sim/sim.py running with TASK=assembly):
+    ros2 launch piper_bringup bringup.launch.py hardware:=isaac motion:=true moveit:=true \
+        task_file:=/piper-stack/tasks/assembly/task.yaml
 """
 
 from launch import LaunchDescription
@@ -34,6 +37,7 @@ def generate_launch_description():
     moveit = LaunchConfiguration('moveit')
     rviz = LaunchConfiguration('rviz')
     policy = LaunchConfiguration('policy')
+    task_file = LaunchConfiguration('task_file')
     # The simulator's clock drives every node of the stack, or none.
     use_sim_time = EqualsSubstitution(hardware, 'isaac')
 
@@ -138,6 +142,13 @@ def generate_launch_description():
                 'Empty: no policy runner.',
             ),
             DeclareLaunchArgument(
+                'task_file',
+                default_value='',
+                description="A task's task.yaml (tasks/<task>/task.yaml): piper_skills' task_scene "
+                "puts its parts in MoveIt's planning scene at the poses on /sim/objects (needs "
+                'moveit:=true). Empty: no task scene.',
+            ),
+            DeclareLaunchArgument(
                 'rviz',
                 default_value='false',
                 choices=['true', 'false'],
@@ -167,6 +178,17 @@ def generate_launch_description():
                 ),
                 launch_arguments={'model_path': policy, 'use_sim_time': use_sim_time}.items(),
                 condition=IfCondition(NotEqualsSubstitution(policy, '')),
+            ),
+            IncludeLaunchDescription(
+                PythonLaunchDescriptionSource(
+                    PathJoinSubstitution(
+                        [FindPackageShare('piper_skills'), 'launch', 'task_scene.launch.py']
+                    )
+                ),
+                launch_arguments={'task_file': task_file, 'use_sim_time': use_sim_time}.items(),
+                condition=IfCondition(
+                    AndSubstitution(moveit, NotEqualsSubstitution(task_file, ''))
+                ),
             ),
             IncludeLaunchDescription(
                 PythonLaunchDescriptionSource(

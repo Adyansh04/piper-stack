@@ -1,0 +1,8 @@
+# Allow (or forbid again) contact between pairs in MoveIt's scene: first[i] with second[i], each a
+# scene object (a task part) or a robot link. Planning and MoveIt Servo then let them touch.
+string[] first
+string[] second
+bool allowed
+---
+bool success
+string message

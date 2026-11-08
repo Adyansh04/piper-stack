@@ -2,7 +2,7 @@
 
 The Piper's manipulation skills on one table: move to a named pose, look at the workspace, find
 objects by name, pick one and place it. Each skill is an action; a behaviour tree or a person
-calls them one at a time.
+calls them one at a time. `task_scene` keeps a contact task's parts in MoveIt's planning scene.
 
 ## Run
 
@@ -38,6 +38,32 @@ Topics in: the wrist camera's `/wrist_camera/color/image_raw`, `/wrist_camera/de
 (16UC1 millimetres or 32FC1 metres, aligned to colour) and `/wrist_camera/color/camera_info`, and
 TF. Calls: `segment_objects`, `compute_grasps`, MoveIt's `compute_ik` and `move_group`, and the
 gripper controller's `ParallelGripperCommand` action.
+
+## Task scene
+
+`task_scene` keeps MoveIt's planning scene in step with a task's parts (`tasks/<task>/task.yaml`),
+so planning and MoveIt Servo know where the fixture and every part are. Each part with collision
+shapes becomes a collision object of its meshes. Its pose comes from `/sim/objects`
+(`tf2_msgs/TFMessage`, child frame = the part's name, in `world`): Isaac Sim's ground truth, or a
+publisher of the fixture's calibrated pose on the real arm. A part that moves more than 1 mm or
+0.01 rad is moved in the scene within `update_period_s`.
+
+```bash
+ros2 launch piper_skills task_scene.launch.py task_file:=/piper-stack/tasks/assembly/task.yaml \
+    use_sim_time:=true
+ros2 service call /task_scene/attach piper_msgs/srv/AttachPart "{part: ring, attach: true}"
+ros2 service call /task_scene/allow_contacts piper_msgs/srv/AllowContacts \
+    "{first: [collar], second: [base], allowed: true}"
+```
+
+| Service | Type | What it does |
+|---|---|---|
+| `~/attach` | `piper_msgs/srv/AttachPart` | Attaches a part to `tcp_link` (it may touch `touch_links`), or detaches it back into the world |
+| `~/allow_contacts` | `piper_msgs/srv/AllowContacts` | Allows or forbids contacts between pairs of parts or links (`first[i]` with `second[i]`) in the allowed collision matrix |
+
+A stage that mates two parts allows their contact for its duration: MoveIt Servo halts the arm
+before a contact the matrix forbids. `bringup.launch.py task_file:=...` starts the node with the
+stack; its parameters are in `config/task_scene.yaml`.
 
 ## How a pick works
 
