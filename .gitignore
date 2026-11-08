@@ -7,3 +7,5 @@ compile_commands.json
 .cache/
 __pycache__/
 *.pyc
+ros_ws/build_*/
+ros_ws/install_*/
