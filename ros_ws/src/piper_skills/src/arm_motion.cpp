@@ -6,6 +6,7 @@
 #include <format>
 #include <future>
 #include <memory>
+#include <optional>
 #include <string>
 #include <utility>
 #include <vector>
@@ -13,6 +14,7 @@
 #include "piper_skills/srdf_states.hpp"
 
 #include <moveit/robot_state/conversions.hpp>
+#include <moveit/robot_state/robot_state.hpp>
 #include <moveit/utils/moveit_error_code.hpp>
 #include <tf2_eigen/tf2_eigen.hpp>
 
@@ -187,6 +189,16 @@ std::expected<double, std::string> ArmMotion::gripper(double position_m, double 
     }
     // A stall on an object is how a grasp ends: it is not a failure.
     return state.position.front();
+}
+
+std::optional<double> ArmMotion::fingerTravel()
+{
+    const moveit::core::RobotStatePtr state = group_.getCurrentState(1.0);
+    if (!state)
+    {
+        return std::nullopt;
+    }
+    return state->getVariablePosition(settings_.gripper_joint);
 }
 
 Eigen::Isometry3d ArmMotion::tcpPose()

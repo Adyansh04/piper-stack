@@ -875,18 +875,12 @@ private:
         return {};
     }
 
-    /// Closes the fingers again on what they hold: their travel where they stop, metres.
-    std::expected<double, std::string> regrip()
-    {
-        // A close never squeezes an object the skills do not know about: the fingers only close
-        // again on the one they hold, and stop on it.
-        return motion_->gripper(gripper_closed_m_, gripper_effort_);
-    }
-
+    /// Whether the fingers still hold something: the gripper controller keeps closing them after a
+    /// grasp, so an object that slipped out leaves them closed.
     bool holding()
     {
-        const auto finger = regrip();
-        return finger && *finger > held_min_m_;
+        const auto travel = motion_->fingerTravel();
+        return travel && *travel > held_min_m_;
     }
 
     Status runPick(
@@ -1123,7 +1117,7 @@ private:
         {
             return std::unexpected(lifted.error());
         }
-        const auto still = regrip();
+        const auto still = motion_->fingerTravel();
         if (!still || *still <= held_min_m_)
         {
             detachHeld();
@@ -1134,7 +1128,7 @@ private:
                     ? std::format(
                           "the object slipped out while lifting (the fingers closed to {:.1f} mm)",
                           2000.0 * *still)
-                    : std::format("the gripper failed after the lift: {}", still.error()));
+                    : std::string("no current finger position after the lift"));
         }
         return *finger;
     }

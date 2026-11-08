@@ -5,6 +5,7 @@
 #include <expected>
 #include <map>
 #include <memory>
+#include <optional>
 #include <string>
 
 #include <Eigen/Geometry>
@@ -118,6 +119,12 @@ public:
      * @return The finger's travel where it stopped, metres, or why the move failed.
      */
     [[nodiscard]] std::expected<double, std::string> gripper(double position_m, double effort);
+
+    /**
+     * @brief One finger's current travel from closed, from the robot's current state.
+     * @return The travel in metres, or nullopt when no current state comes within a second.
+     */
+    [[nodiscard]] std::optional<double> fingerTravel();
 
     /**
      * @brief The TCP's current pose in the planning frame.
