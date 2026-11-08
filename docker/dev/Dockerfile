@@ -1,6 +1,6 @@
 # The piper-stack image: ROS 2 Lyrical (Ubuntu 26.04, GCC 15) with everything the stack runs:
 # ros2_control, MoveIt 2, the wrist camera's driver, CUDA and TensorRT for the perception engines,
-# Node for the behaviour-tree web UI, and uv for the Python 3.12 environments of the model servers.
+# and uv for the Python 3.12 environments of the model servers.
 # The source is mounted at /piper-stack, never copied in.
 ARG BASE_IMAGE=ros:lyrical-ros-base@sha256:3224ee150cb02eb89a5e0811bc267b57ed3a91b9c10191df57810726a7e916d7
 FROM ${BASE_IMAGE}
@@ -13,7 +13,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         build-essential cmake ninja-build mold ccache gdb \
         clang-format clang-tidy clangd \
         can-utils iproute2 curl wget ca-certificates git \
-        libzmq3-dev cppzmq-dev zlib1g-dev nodejs npm \
+        libzmq3-dev cppzmq-dev zlib1g-dev \
         python3-colcon-common-extensions python3-rosdep \
         ros-lyrical-ros2-control \
         ros-lyrical-ros2-controllers \
