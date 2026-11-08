@@ -24,4 +24,6 @@ cp .env.example .env
 - [piper_sdk](https://github.com/agilexrobotics/piper_sdk) by AgileX Robotics (MIT): the CAN
   protocol reference for `piper_driver`.
 - [piper_ros](https://github.com/agilexrobotics/piper_ros) by AgileX Robotics (MIT): the robot
-  description and meshes.
+  description and its collision meshes.
+- [MuJoCo Menagerie's agilex_piper](https://github.com/google-deepmind/mujoco_menagerie/tree/main/agilex_piper)
+  by RosenYin (MIT): the coloured visual meshes, merged per link and colour.

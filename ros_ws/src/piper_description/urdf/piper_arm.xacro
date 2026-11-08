@@ -12,17 +12,11 @@
       <inertia ixx="0.00267433" ixy="-0.00000073" ixz="-0.00017389" iyy="0.00282612" iyz="0.0000004" izz="0.00089624" />
     </inertial>
     <visual>
-      <origin
-        xyz="0 0 0"
-        rpy="0 0 0" />
       <geometry>
-        <mesh
-          filename="package://piper_description/meshes/base_link.STL" />
+        <mesh filename="package://piper_description/meshes/visual/base_link_gray.stl" />
       </geometry>
-      <material
-        name="">
-        <color
-          rgba="0.792156862745098 0.819607843137255 0.933333333333333 1" />
+      <material name="piper_gray_mat">
+        <color rgba="0.59 0.59 0.59 1" />
       </material>
     </visual>
     <collision>
@@ -43,17 +37,11 @@
       <inertia ixx="0.00050027" ixy="0.00000078" ixz="0.00000626" iyy="0.00040879" iyz="0.00000462" izz="0.00045802" />
     </inertial>
     <visual>
-      <origin
-        xyz="0 0 0"
-        rpy="0 0 0" />
       <geometry>
-        <mesh
-          filename="package://piper_description/meshes/link1.STL" />
+        <mesh filename="package://piper_description/meshes/visual/link1_gray.stl" />
       </geometry>
-      <material
-        name="">
-        <color
-          rgba="0.792156862745098 0.819607843137255 0.933333333333333 1" />
+      <material name="piper_gray_mat">
+        <color rgba="0.59 0.59 0.59 1" />
       </material>
     </visual>
     <collision>
@@ -92,17 +80,43 @@
       <inertia ixx="0.00111915" ixy="0.00182916" ixz="0.00019233" iyy="0.06763251" iyz="0.00000767" izz="0.067559" />
     </inertial>
     <visual>
-      <origin
-        xyz="0 0 0"
-        rpy="0 0 0" />
       <geometry>
-        <mesh
-          filename="package://piper_description/meshes/link2.STL" />
+        <mesh filename="package://piper_description/meshes/visual/link2_dark_gray.stl" />
       </geometry>
-      <material
-        name="">
-        <color
-          rgba="0.792156862745098 0.819607843137255 0.933333333333333 1" />
+      <material name="piper_dark_gray_mat">
+        <color rgba="0.086 0.086 0.086 1" />
+      </material>
+    </visual>
+    <visual>
+      <geometry>
+        <mesh filename="package://piper_description/meshes/visual/link2_darker_gray.stl" />
+      </geometry>
+      <material name="piper_darker_gray_mat">
+        <color rgba="0.14 0.14 0.14 1" />
+      </material>
+    </visual>
+    <visual>
+      <geometry>
+        <mesh filename="package://piper_description/meshes/visual/link2_gray.stl" />
+      </geometry>
+      <material name="piper_gray_mat">
+        <color rgba="0.59 0.59 0.59 1" />
+      </material>
+    </visual>
+    <visual>
+      <geometry>
+        <mesh filename="package://piper_description/meshes/visual/link2_light_medium_gray.stl" />
+      </geometry>
+      <material name="piper_light_medium_gray_mat">
+        <color rgba="0.85 0.85 0.85 1" />
+      </material>
+    </visual>
+    <visual>
+      <geometry>
+        <mesh filename="package://piper_description/meshes/visual/link2_red.stl" />
+      </geometry>
+      <material name="piper_red_mat">
+        <color rgba="0.82 0.15 0.15 1" />
       </material>
     </visual>
     <collision>
@@ -142,17 +156,35 @@
       <inertia ixx="0.01347608" ixy="0.00161034" ixz="0.00000066" iyy="0.00046377" iyz="0.00000162" izz="0.01363321" />
     </inertial>
     <visual>
-      <origin
-        xyz="0 0 0"
-        rpy="0 0 0" />
       <geometry>
-        <mesh
-          filename="package://piper_description/meshes/link3.STL" />
+        <mesh filename="package://piper_description/meshes/visual/link3_darker_gray.stl" />
       </geometry>
-      <material
-        name="">
-        <color
-          rgba="0.792156862745098 0.819607843137255 0.933333333333333 1" />
+      <material name="piper_darker_gray_mat">
+        <color rgba="0.14 0.14 0.14 1" />
+      </material>
+    </visual>
+    <visual>
+      <geometry>
+        <mesh filename="package://piper_description/meshes/visual/link3_gray.stl" />
+      </geometry>
+      <material name="piper_gray_mat">
+        <color rgba="0.59 0.59 0.59 1" />
+      </material>
+    </visual>
+    <visual>
+      <geometry>
+        <mesh filename="package://piper_description/meshes/visual/link3_red.stl" />
+      </geometry>
+      <material name="piper_red_mat">
+        <color rgba="0.82 0.15 0.15 1" />
+      </material>
+    </visual>
+    <visual>
+      <geometry>
+        <mesh filename="package://piper_description/meshes/visual/link3_white.stl" />
+      </geometry>
+      <material name="piper_white_mat">
+        <color rgba="1 1 1 1" />
       </material>
     </visual>
     <collision>
@@ -192,17 +224,19 @@
       <inertia ixx="0.00017844" ixy="0.00000062" ixz="0.00000067" iyy="0.00018914" iyz="0.00000408" izz="0.00014613" />
     </inertial>
     <visual>
-      <origin
-        xyz="0 0 0"
-        rpy="0 0 0" />
       <geometry>
-        <mesh
-          filename="package://piper_description/meshes/link4.STL" />
+        <mesh filename="package://piper_description/meshes/visual/link4_darker_gray.stl" />
       </geometry>
-      <material
-        name="">
-        <color
-          rgba="0.792156862745098 0.819607843137255 0.933333333333333 1" />
+      <material name="piper_darker_gray_mat">
+        <color rgba="0.14 0.14 0.14 1" />
+      </material>
+    </visual>
+    <visual>
+      <geometry>
+        <mesh filename="package://piper_description/meshes/visual/link4_gray.stl" />
+      </geometry>
+      <material name="piper_gray_mat">
+        <color rgba="0.59 0.59 0.59 1" />
       </material>
     </visual>
     <collision>
@@ -241,17 +275,35 @@
       <inertia ixx="0.00172318" ixy="0.00000259" ixz="0.00000010" iyy="0.00017936" iyz="0.00000990" izz="0.00171172" />
     </inertial>
     <visual>
-      <origin
-        xyz="0 0 0"
-        rpy="0 0 0" />
       <geometry>
-        <mesh
-          filename="package://piper_description/meshes/link5.STL" />
+        <mesh filename="package://piper_description/meshes/visual/link5_black.stl" />
       </geometry>
-      <material
-        name="">
-        <color
-          rgba="0.792156862745098 0.819607843137255 0.933333333333333 1" />
+      <material name="piper_black_mat">
+        <color rgba="0 0 0 1" />
+      </material>
+    </visual>
+    <visual>
+      <geometry>
+        <mesh filename="package://piper_description/meshes/visual/link5_darker_gray.stl" />
+      </geometry>
+      <material name="piper_darker_gray_mat">
+        <color rgba="0.14 0.14 0.14 1" />
+      </material>
+    </visual>
+    <visual>
+      <geometry>
+        <mesh filename="package://piper_description/meshes/visual/link5_gray.stl" />
+      </geometry>
+      <material name="piper_gray_mat">
+        <color rgba="0.59 0.59 0.59 1" />
+      </material>
+    </visual>
+    <visual>
+      <geometry>
+        <mesh filename="package://piper_description/meshes/visual/link5_light_gray.stl" />
+      </geometry>
+      <material name="piper_light_gray_mat">
+        <color rgba="0.98 0.98 0.98 1" />
       </material>
     </visual>
     <collision>
@@ -290,17 +342,11 @@
       <inertia ixx="0.00152112" ixy="0.00000202" ixz="0.00000261" iyy="0.00138626" iyz="0.00000002" izz="0.00031152" />
     </inertial>
     <visual>
-      <origin
-        xyz="0 0 0"
-        rpy="0 0 0" />
       <geometry>
-        <mesh
-          filename="package://piper_description/meshes/link6.STL" />
+        <mesh filename="package://piper_description/meshes/visual/link6_gray.stl" />
       </geometry>
-      <material
-        name="">
-        <color
-          rgba="0.898039215686275 0.917647058823529 0.929411764705882 1" />
+      <material name="piper_gray_mat">
+        <color rgba="0.59 0.59 0.59 1" />
       </material>
     </visual>
     <collision>
@@ -347,20 +393,6 @@
         iyz="0.00000005"
         izz="0.00039442" />
     </inertial>
-    <visual>
-      <origin
-        xyz="0 0 0"
-        rpy="0 0 0" />
-      <geometry>
-        <mesh
-          filename="package://piper_description/meshes/gripper_base.STL" />
-      </geometry>
-      <material
-        name="">
-        <color
-          rgba="0.792156862745098 0.819607843137255 0.933333333333333 1" />
-      </material>
-    </visual>
     <collision>
       <origin
         xyz="0 0 0"
@@ -399,17 +431,11 @@
         izz="0.0000747" />
     </inertial>
     <visual>
-      <origin
-        xyz="0 0 0"
-        rpy="0 0 0" />
       <geometry>
-        <mesh
-          filename="package://piper_description/meshes/link7.STL" />
+        <mesh filename="package://piper_description/meshes/visual/link7_gray.stl" />
       </geometry>
-      <material
-        name="">
-        <color
-          rgba="0.792156862745098 0.819607843137255 0.933333333333333 1" />
+      <material name="piper_gray_mat">
+        <color rgba="0.59 0.59 0.59 1" />
       </material>
     </visual>
     <collision>
@@ -457,17 +483,11 @@
         izz="0.0000747" />
     </inertial>
     <visual>
-      <origin
-        xyz="0 0 0"
-        rpy="0 0 0" />
       <geometry>
-        <mesh
-          filename="package://piper_description/meshes/link8.STL" />
+        <mesh filename="package://piper_description/meshes/visual/link8_gray.stl" />
       </geometry>
-      <material
-        name="">
-        <color
-          rgba="0.792156862745098 0.819607843137255 0.933333333333333 1" />
+      <material name="piper_gray_mat">
+        <color rgba="0.59 0.59 0.59 1" />
       </material>
     </visual>
     <collision>
@@ -498,6 +518,13 @@
       effort="10"
       velocity="1" />
     <mimic joint="${prefix}joint7" multiplier="-1" offset="0" />
+  </joint>
+  <!-- Tool centre point: midway along the finger pads (z 123.2 to 135.8 mm), between them. -->
+  <link name="${prefix}tcp" />
+  <joint name="${prefix}tcp_joint" type="fixed">
+    <parent link="${prefix}gripper_base" />
+    <child link="${prefix}tcp" />
+    <origin xyz="0 0 0.1295" rpy="0 0 0" />
   </joint>
   </xacro:macro>
 </robot>

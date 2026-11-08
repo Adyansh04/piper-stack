@@ -3,6 +3,9 @@
     ros2 launch piper_bringup camera.launch.py device_ip:=192.168.10.200 rviz:=true
     ros2 launch piper_bringup camera.launch.py color_resolution:=1280x960 depth_resolution:=1280x800
 
+Topics under /wrist_camera, frames wrist_camera_*; with the robot description running, pass
+publish_tf:=false so the URDF (piper_wrist_camera.xacro) places them on the wrist.
+
 Modes: colour 1280x960, 640x480, 320x240 (JPEG); depth 1280x800, 640x400, 320x200; 8-30 fps.
 """
 
@@ -16,6 +19,7 @@ from launch_ros.substitutions import FindPackageShare
 
 # Forwarded to Percipio's launch file as they are: (name, default, description).
 CAMERA_ARGS = [
+    ('publish_tf', 'true', 'false: leave the camera frames to the robot description.'),
     ('device_ip', '192.168.10.200', 'Camera IP; empty opens the first camera found.'),
     ('color_resolution', '640x480', 'Colour mode: 1280x960, 640x480 or 320x240.'),
     ('depth_resolution', '640x400', 'Depth mode: 1280x800, 640x400 or 320x200.'),
@@ -39,7 +43,10 @@ def generate_launch_description():
             description='true: open RViz with colour, depth and the coloured cloud.'),
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(percipio),
-            launch_arguments={name: LaunchConfiguration(name) for name, _, _ in CAMERA_ARGS}.items(),
+            launch_arguments={
+                'camera_name': 'wrist_camera',
+                **{name: LaunchConfiguration(name) for name, _, _ in CAMERA_ARGS},
+            }.items(),
         ),
         Node(
             package='rviz2',

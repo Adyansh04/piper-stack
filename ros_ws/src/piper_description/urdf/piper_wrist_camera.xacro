@@ -1,0 +1,87 @@
+<?xml version="1.0"?>
+<!-- The wrist camera: a printed mount on the gripper and a Percipio GM461-E1 screwed to it.
+     The mount's saddle wraps the gripper's neck (radius 28.5 mm) from the housing's top face to
+     the link6 flange; two M3 screws hold it to the housing's tab on the -x side. The camera's two
+     rear M3 holes (45 mm apart) sit on the mount's plate, which tilts it 20 deg towards the
+     fingers. The frames follow Percipio's driver (camera_name = name), which leaves them to this
+     description when launched with publish_tf false. Depth is registered to colour, so both
+     optical frames sit at the colour lens. Measured from the CAD: the mount and the hole pattern.
+     Estimated until the hand-eye calibration: the colour lens 22.2 mm left of the body's centre
+     (product photo, 66 mm IR baseline) and 4 mm behind the front face. -->
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro">
+  <xacro:macro name="piper_wrist_camera" params="prefix parent name">
+    <link name="${prefix}camera_mount">
+      <inertial>
+        <!-- Solid PLA, 30.8 cm^3. -->
+        <origin xyz="-0.0414 -0.00515 -0.02822" rpy="0 0 0"/>
+        <mass value="0.0382"/>
+        <inertia ixx="2.5323e-05" ixy="-6.5485e-06" ixz="-3.3252e-06"
+                 iyy="2.6123e-05" iyz="-1.0335e-06" izz="3.7945e-05"/>
+      </inertial>
+      <visual>
+        <geometry>
+          <mesh filename="package://piper_description/meshes/camera_mount.stl"/>
+        </geometry>
+        <material name="piper_camera_mount">
+          <color rgba="0.2 0.2 0.2 1"/>
+        </material>
+      </visual>
+      <collision>
+        <geometry>
+          <mesh filename="package://piper_description/meshes/camera_mount.stl"/>
+        </geometry>
+      </collision>
+    </link>
+    <!-- Origin on the joint-6 axis at the housing's top face, axes as the parent's. -->
+    <joint name="${prefix}camera_mount_joint" type="fixed">
+      <parent link="${parent}"/>
+      <child link="${prefix}camera_mount"/>
+      <origin xyz="0 0 0.044" rpy="0 0 0"/>
+    </joint>
+
+    <!-- At the colour lens: x along the optical axis, y left, z up. -->
+    <link name="${name}_link">
+      <inertial>
+        <origin xyz="-0.012 -0.0222 0" rpy="0 0 0"/>
+        <mass value="0.135"/>
+        <inertia ixx="9.816e-05" ixy="0" ixz="0" iyy="1.855e-05" iyz="0" izz="1.0265e-04"/>
+      </inertial>
+      <visual>
+        <origin xyz="-0.012 -0.0222 0" rpy="0 0 0"/>
+        <geometry>
+          <box size="0.032 0.090 0.025"/>
+        </geometry>
+        <material name="piper_camera_body">
+          <color rgba="0.08 0.08 0.08 1"/>
+        </material>
+      </visual>
+      <collision>
+        <origin xyz="-0.012 -0.0222 0" rpy="0 0 0"/>
+        <geometry>
+          <box size="0.032 0.090 0.025"/>
+        </geometry>
+      </collision>
+    </link>
+    <joint name="${prefix}${name}_joint" type="fixed">
+      <parent link="${prefix}camera_mount"/>
+      <child link="${name}_link"/>
+      <origin xyz="-0.06924 -0.0078 -0.00355" rpy="0 -1.2217305 0"/>
+    </joint>
+
+    <xacro:macro name="piper_camera_stream" params="stream">
+      <link name="${name}_${stream}_frame"/>
+      <joint name="${name}_${stream}_joint" type="fixed">
+        <parent link="${name}_link"/>
+        <child link="${name}_${stream}_frame"/>
+      </joint>
+      <link name="${name}_${stream}_optical_frame"/>
+      <joint name="${name}_${stream}_optical_joint" type="fixed">
+        <parent link="${name}_${stream}_frame"/>
+        <child link="${name}_${stream}_optical_frame"/>
+        <origin xyz="0 0 0" rpy="${-pi/2} 0 ${-pi/2}"/>
+      </joint>
+    </xacro:macro>
+    <xacro:piper_camera_stream stream="color"/>
+    <xacro:piper_camera_stream stream="depth"/>
+  </xacro:macro>
+</robot>
