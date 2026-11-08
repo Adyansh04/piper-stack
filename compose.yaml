@@ -1,12 +1,14 @@
 # The dev container: build, tests and the ROS 2 Lyrical stack, in sim or on the real arm. Run it
-# through scripts/manage.sh, which sets HOST_UID and HOST_GID.
+# through scripts/manage.sh, which sets HOST_UID, HOST_GID and DEV_IMAGE_TAG.
 name: piper-stack
 
 services:
   dev:
-    image: piper-dev:local
+    image: ghcr.io/adyansh04/piper-stack-dev:${DEV_IMAGE_TAG:-local}
     build:
       context: docker/dev
+      # The host's resolver: the default build network cannot resolve names behind a VPN.
+      network: host
       args:
         HOST_UID: ${HOST_UID:-1000}
         HOST_GID: ${HOST_GID:-1000}
