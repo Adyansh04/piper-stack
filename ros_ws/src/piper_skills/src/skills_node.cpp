@@ -362,7 +362,7 @@ private:
         t.touch_links = touch_links_;
         t.closed_m = gripper_closed_m_;
         t.effort = gripper_effort_;
-        t.held_min_m = param<double>("task.held_min_m", 0.001);
+        t.held_min_m = param<double>("task.held_min_m", 0.0003);
         t.squeeze_m = param<double>("task.squeeze_m", 0.003);
         t.pregrasp_m = pregrasp_m_;
         t.lift_m = lift_m_;

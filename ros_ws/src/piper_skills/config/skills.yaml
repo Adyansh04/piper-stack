@@ -173,9 +173,10 @@
       # moves onto the mate (0.1: 10 mm/s) and of the screw's and twist's turns (0.6: 0.3 rad/s).
       insert_velocity_scale: 0.1
       turn_velocity_scale: 0.6
-      # A finger stopping at or below this travel holds nothing, metres: 1 mm, as the simulator's
-      # soft finger contacts let a part sink about 2 mm into each pad (the 8 mm pin reads 2 mm).
-      held_min_m: 0.001
+      # A finger stopping at or below this travel holds nothing, metres: 0.3 mm, as the simulator's
+      # soft finger contacts let a part sink into the pads (the 8 mm pin, squeezed, reads 0.9 mm);
+      # fingers that miss close to 0.
+      held_min_m: 0.0003
       # Once the fingers stop on a part they are sent this much further in, metres: 3 mm at the
       # sim's 2000 N/m finger drives is a 6 N squeeze, under their 10 N limit, so both fingers keep
       # pushing and hold the part centred (saturated, the pair drifts sideways with the part).
