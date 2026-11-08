@@ -1,0 +1,140 @@
+# Task 2: plug a USB-C cable into a socket on a printed demo board. The arm takes the plug from
+# its holder (top-down grasp across the plug's 6 mm sides) and inserts it horizontally. Read by
+# the simulator (sim/task.py) and Isaac Lab. The CAD meshes are in millimetres; the socket's and
+# the plug's frames sit at the opening and at the tip, z out of the opening and along the
+# insertion. Everything else is in metres and degrees.
+name: usb_c
+
+materials:
+  # Printed PLA on PLA and on the table; to be measured at the lab. Newton's contact stiffness is
+  # what the plug was inserted at (VBD, 8 Nov).
+  pla:
+    static_friction: 0.35
+    dynamic_friction: 0.3
+    restitution: 0.0
+    contact_stiffness: 1.0e5
+    contact_damping: 0.0
+    torsional_friction_m: 0.0
+    rolling_friction_m: 0.0
+  # The plug's overmould (TPE) on the gripper's pads; its steel shell in the steel socket.
+  overmould:
+    static_friction: 0.6
+    dynamic_friction: 0.5
+    restitution: 0.0
+    contact_stiffness: 1.0e5
+    contact_damping: 0.0
+    torsional_friction_m: 0.0
+    rolling_friction_m: 0.0
+  steel:
+    static_friction: 0.25
+    dynamic_friction: 0.2
+    restitution: 0.0
+    contact_stiffness: 1.0e5
+    contact_damping: 0.0
+    torsional_friction_m: 0.0
+    rolling_friction_m: 0.0
+
+# Contacts are looked for within gap_m of a surface; a mesh's signed distance field is kept
+# within sdf_band_m of it. The plug went in at 0.5 mm and 1 mm in Newton (8 Nov).
+contact: {gap_m: 0.0005, sdf_band_m: 0.001}
+
+# A printed part's mass is its mesh volume times the density times the share of it a print fills.
+print: {density_kg_m3: 1240.0, fill: 0.5}
+
+# The USB-C fit: plug shell 8.25 x 2.40 mm in a receptacle 8.34 x 2.56 mm, 6.6 mm deep (no
+# tongue). The board's socket window takes a generic panel-mount socket until the real one is
+# chosen.
+parts:
+  board:
+    body: static
+    material: pla
+    shapes:
+      - {mesh: cad/board.stl, collision: convex_decomposition, colour: [0.88, 0.88, 0.85]}
+  socket:
+    body: static
+    material: steel
+    shapes:
+      - mesh: cad/socket.stl
+        collision: sdf
+        sdf_resolution: 256
+        colour: [0.7, 0.7, 0.72]
+        metallic: 1.0
+        roughness: 0.35
+  plug_holder:
+    body: static
+    material: pla
+    shapes:
+      - {mesh: cad/plug_holder.stl, collision: sdf, sdf_resolution: 256, colour: [0.95, 0.55, 0.1]}
+  cable_anchor:
+    body: static
+    material: pla
+    shapes:
+      - {mesh: cad/cable_anchor.stl, collision: none, colour: [0.2, 0.22, 0.25]}
+  plug:
+    body: dynamic
+    material: overmould
+    # A USB-C plug with its overmould, until weighed.
+    mass_kg: 0.004
+    shapes:
+      - mesh: cad/plug_shell.stl
+        collision: sdf
+        sdf_resolution: 256
+        colour: [0.75, 0.75, 0.77]
+        metallic: 1.0
+        roughness: 0.3
+      - {mesh: cad/plug_body.stl, collision: convex_hull, colour: [0.05, 0.05, 0.06]}
+
+# The cable: a chain of capsules from the plug's back to the anchor, straight at rest; each joint
+# bends and twists against a spring of the cable's stiffness over a segment. Stiffness and damping
+# are first guesses for a 3.5 mm USB cable, to be fitted to a sag test at the lab.
+cable:
+  plug: plug
+  # Where the cable leaves the plug, in the plug's frame.
+  attach: [0.0, 0.0, -0.03265]
+  colour: [0.05, 0.05, 0.06]
+  radius_m: 0.00175
+  segment_length_m: 0.01
+  mass_kg_per_m: 0.025
+  bend_stiffness_n_m2: 2.0e-4
+  twist_stiffness_n_m2: 1.0e-4
+  # Per joint, N m s/rad: near critical for a segment.
+  damping_n_m_s: 3.0e-5
+  # From the plug's back (at its start pose) to the anchor: back through the holder's slot, down
+  # to the table, round in a loop that leaves slack for the reach to the socket.
+  path:
+    in: plug_holder
+    points:
+      - [0.0, -0.012, 0.036]
+      - [0.0, -0.045, 0.002]
+      - [0.0, -0.09, 0.002]
+      - [0.04, -0.12, 0.002]
+      - [0.08, -0.09, 0.002]
+      - [0.08, -0.035, 0.002]
+      - [0.08, -0.03, 0.006]
+
+# Poses: xyz in metres and rpy in degrees (roll, pitch, yaw about the fixed axes, as in URDF), in
+# the robot's world frame (its base at the origin on the table top) or in the frame of the part
+# named by `in`. A state's parts start from their start poses.
+scene:
+  fixed:
+    # The socket faces the arm's side (-y) with its long side vertical, 36 mm above the table.
+    board: {xyz: [0.3, 0.1, 0.0]}
+    socket: {in: board, xyz: [0.0, -0.015, 0.036], rpy: [90, -90, 0]}
+    plug_holder: {xyz: [0.3, -0.06, 0.0]}
+    cable_anchor: {in: plug_holder, xyz: [0.08, -0.02, 0.0]}
+  # The plug in its holder, pointing at the socket.
+  start:
+    plug: {in: plug_holder, xyz: [0.0, 0.04065, 0.036], rpy: [-90, -90, 0]}
+  # Seated: the tip at the bottom of the receptacle.
+  goal:
+    plug: {in: socket, xyz: [0.0, 0.0, -0.0066], rpy: [180, 0, 0]}
+
+# Images of the assets (sim/preview.py): the arm's joints (radians, metres for the fingers) and
+# the views, eye and target in the world frame.
+preview:
+  # The ready pose turned aside (joint 1), out of the overhead camera's view of the parts.
+  arm: {joint1: 1.2, joint2: 1.32, joint3: -1.14, joint5: 1.1, joint7: 0.035, joint8: -0.035}
+  views:
+    overview: {eye: [0.72, -0.48, 0.42], target: [0.25, 0.0, 0.04]}
+    plug: {eye: [0.42, -0.17, 0.12], target: [0.3, -0.04, 0.025]}
+    socket: {eye: [0.36, 0.0, 0.08], target: [0.3, 0.085, 0.036]}

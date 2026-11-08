@@ -1,0 +1,98 @@
+# Task 1: a threaded assembly of printed PLA parts, put together on a base in four stages: the
+# keyed ring onto the post, the collar screwed onto the boss (2.6 turns), the pin into the boss,
+# the cap locked onto the collar with a 30 degree twist. Read by the simulator (sim/task.py) and
+# Isaac Lab. The CAD meshes are in millimetres, each part's frame at its bottom centre with z up;
+# everything else is in metres and degrees.
+name: assembly
+
+materials:
+  # Printed PLA on PLA, on the table and on the gripper's pads; to be measured at the lab. Newton's
+  # contact stiffness and damping are the ones its threaded nut-and-bolt example runs at.
+  pla:
+    static_friction: 0.35
+    dynamic_friction: 0.3
+    restitution: 0.0
+    contact_stiffness: 1.0e7
+    contact_damping: 1.0e4
+    torsional_friction_m: 0.0
+    rolling_friction_m: 0.0
+
+# Contacts are looked for within gap_m of a surface; a mesh's signed distance field is kept
+# within sdf_band_m of it. 2 mm each threaded the collar onto the boss in Newton (8 Nov).
+contact: {gap_m: 0.002, sdf_band_m: 0.002}
+
+# A part's mass is its mesh volume times the density times the share of it a print fills (walls
+# and infill), until the printed parts are weighed (mass_kg on the part then wins).
+print: {density_kg_m3: 1240.0, fill: 0.5}
+
+# Each part: static (fixed in the world) or dynamic (a rigid body), its material and its shapes.
+# A shape's collision is sdf (a signed distance field of the mesh at sdf_resolution cells along
+# its longest side: threads, slots and pockets), convex_hull, convex_decomposition or none. Under
+# Newton a convex hull does not collide with a static SDF mesh (8 Nov: base and pin fell through
+# the fixture), so everything that touches the fixture is sdf.
+parts:
+  fixture:
+    body: static
+    material: pla
+    shapes:
+      - {mesh: cad/fixture.stl, collision: sdf, sdf_resolution: 512, colour: [0.2, 0.22, 0.25]}
+  # In three pieces, so the thread gets a fine SDF of its own (cad/base.step is the part to print).
+  base:
+    body: dynamic
+    material: pla
+    shapes:
+      - {mesh: cad/base_plate.stl, collision: sdf, sdf_resolution: 512, colour: [0.88, 0.88, 0.85]}
+      - {mesh: cad/base_post.stl, collision: sdf, sdf_resolution: 256, colour: [0.88, 0.88, 0.85]}
+      - {mesh: cad/base_boss.stl, collision: sdf, sdf_resolution: 512, colour: [0.88, 0.88, 0.85]}
+  ring:
+    body: dynamic
+    material: pla
+    shapes:
+      - {mesh: cad/ring.stl, collision: sdf, sdf_resolution: 256, colour: [0.95, 0.55, 0.1]}
+  collar:
+    body: dynamic
+    material: pla
+    shapes:
+      - {mesh: cad/collar.stl, collision: sdf, sdf_resolution: 512, colour: [0.15, 0.4, 0.85]}
+  pin:
+    body: dynamic
+    material: pla
+    shapes:
+      - {mesh: cad/pin.stl, collision: sdf, sdf_resolution: 256, colour: [0.85, 0.15, 0.15]}
+  cap:
+    body: dynamic
+    material: pla
+    shapes:
+      - {mesh: cad/cap.stl, collision: sdf, sdf_resolution: 512, colour: [0.2, 0.7, 0.3]}
+
+# Poses: xyz in metres and rpy in degrees (roll, pitch, yaw about the fixed axes, as in URDF), in
+# the robot's world frame (its base at the origin on the table top) or in the frame of the part
+# named by `in`. A state's parts start from their start poses.
+scene:
+  # Long side along y, within the top-down reach (about 0.33 m from the base).
+  fixed:
+    fixture: {xyz: [0.25, 0.0, 0.0], rpy: [0, 0, 90]}
+  # Every part in its pocket; the ring's key faces the post's flat (yaw 180 degrees).
+  start:
+    base: {in: fixture, xyz: [-0.025, 0.036, 0.005]}
+    ring: {in: fixture, xyz: [-0.08, -0.042, 0.007], rpy: [0, 0, 180]}
+    collar: {in: fixture, xyz: [-0.01, -0.042, 0.007]}
+    cap: {in: fixture, xyz: [0.085, 0.036, 0.007]}
+    pin: {in: fixture, xyz: [0.06, -0.042, 0.002]}
+  # Assembled: the collar seated on the base (its yaw follows the thread), the cap's lugs locked
+  # 30 degrees clockwise from the collar's entries.
+  goal:
+    ring: {in: base, xyz: [-0.035, 0.0, 0.012], rpy: [0, 0, 180]}
+    collar: {in: base, xyz: [0.035, 0.0, 0.012]}
+    pin: {in: base, xyz: [0.035, 0.0, 0.014]}
+    cap: {in: base, xyz: [0.035, 0.0, 0.02], rpy: [0, 0, -30]}
+
+# Images of the assets (sim/preview.py): the arm's joints (radians, metres for the fingers) and
+# the views, eye and target in the world frame.
+preview:
+  # The ready pose turned aside (joint 1), out of the overhead camera's view of the parts.
+  arm: {joint1: 1.2, joint2: 1.32, joint3: -1.14, joint5: 1.1, joint7: 0.035, joint8: -0.035}
+  views:
+    overview: {eye: [0.72, -0.48, 0.42], target: [0.2, 0.0, 0.05]}
+    fixture: {eye: [0.47, -0.27, 0.3], target: [0.25, 0.0, 0.0]}
+    base: {eye: [0.36, -0.15, 0.14], target: [0.214, -0.025, 0.02]}
