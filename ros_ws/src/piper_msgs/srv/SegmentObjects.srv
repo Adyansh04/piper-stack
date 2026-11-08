@@ -1,6 +1,7 @@
 # Open-vocabulary instance segmentation of one image.
 
-# Image to segment; empty to take the newest image of the configured camera, refused when that one is
+# Image to segment; empty to take the newest image of the configured camera, refused when that one
+# is
 # older than the server's max_image_age_s.
 sensor_msgs/Image image
 

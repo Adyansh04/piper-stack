@@ -60,6 +60,16 @@ plotjuggler4
 `record.launch.py` writes MCAP bags to `data/bags/` (profiles in `piper_bringup`'s README);
 PlotJuggler 4, in the dev image with its ROS 2 extensions, plots live topics and bags.
 
+## Guides
+
+- [The real arm](docs/guides/real-arm.md): setup, read-only first, moving it, ending safely.
+- [Simulation](docs/guides/simulation.md): Isaac Sim's variants, options and topics.
+- [Missions](docs/guides/missions.md): behaviour trees over the pick and place skills.
+- [The mock arm and the camera alone](docs/guides/mock-and-camera.md).
+- [Architecture](docs/ARCHITECTURE.md): the packages, the data flow and the decisions behind them.
+
+Each package's README (under `ros_ws/src/`) lists its nodes, topics, parameters and tests.
+
 ## Credits
 
 - [piper_sdk](https://github.com/agilexrobotics/piper_sdk) by AgileX Robotics (MIT): the CAN

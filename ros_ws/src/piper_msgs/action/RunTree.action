@@ -3,7 +3,8 @@
 # Tree id from the executor's loaded files, e.g. "PickAndPlace".
 string tree
 
-# "key=value" entries written to the tree's blackboard before it starts; a tree's required keys must be
+# "key=value" entries written to the tree's blackboard before it starts; a tree's required keys must
+# be
 # among them.
 string[] blackboard
 ---

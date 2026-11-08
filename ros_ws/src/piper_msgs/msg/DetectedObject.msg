@@ -10,7 +10,7 @@ string label
 float32 score
 
 # Centroid of the object's own points, axes along their principal directions on the floor (z up), in
-# the robot's base frame; the stamp is the image's.
+# the planning frame; the stamp is the image's.
 geometry_msgs/PoseStamped pose
 
 # Extent of the points along the pose axes, in metres.

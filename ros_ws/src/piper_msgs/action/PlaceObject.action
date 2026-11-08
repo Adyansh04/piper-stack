@@ -2,7 +2,8 @@
 # its centre at a target (relative, metric, anchor).
 
 # "free" (also when empty): the free spot nearest the robot in `region`. "relative": x and y from
-# -1 to 1 across the table's workspace, where +-1 is as far as the object still sits fully on it. "metric": x and
+# -1 to 1 across the table's workspace, where +-1 is as far as the object still sits fully on it.
+# "metric": x and
 # y in metres from the workspace's centre. "anchor": x and y in metres from the centre of the object
 # `anchor` names, found on the table. x points to the right and y away, as seen from the robot's
 # base (base_link's -y and +x axes).
@@ -34,7 +35,8 @@ geometry_msgs/PoseStamped anchor_pose
 bool success
 string message
 
-# Where the object was set down, in the robot's base frame: its centre on the table, its long axis as the x axis;
+# Where the object was set down, in the planning frame: its centre on the table, its long axis as
+# the x axis;
 # valid only when success is true.
 geometry_msgs/PoseStamped place_pose
 

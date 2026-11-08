@@ -1,4 +1,4 @@
-# Move the arm to a named joint configuration of the SRDF, e.g. "transport".
+# Move the arm to a named joint configuration of the SRDF, e.g. "ready".
 
 string name
 

@@ -1,4 +1,4 @@
-# Resolves a place target on the table to a pose in the robot's base frame, and whether the arm
+# Resolves a place target on the table to a pose in the planning frame, and whether the arm
 # reaches it with the held object, before PlaceObject commits to it.
 # As in PlaceObject: "free" (also when empty), "relative", "metric" or "anchor", with x and y.
 string mode
