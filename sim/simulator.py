@@ -14,6 +14,7 @@ import math
 import threading
 import time
 import traceback
+from collections import deque
 from pathlib import Path
 
 import carb
@@ -43,6 +44,10 @@ QOS_JOINTS = QoSProfile(depth=1, reliability=ReliabilityPolicy.RELIABLE)
 # The robot USD's physics variant for each engine (the importer writes physx and mujoco, each on
 # top of plain UsdPhysics).
 PHYSICS_VARIANTS = {'physx': 'physx', 'newton': 'mujoco'}
+# Physics steps the published velocity spans (25 ms at 200 Hz): a single step's difference carries
+# the contact solver's jitter, which a finger pressing on an object turns into motion that never
+# stops (the gripper controller's stall check).
+VELOCITY_WINDOW_STEPS = 5
 
 
 class StepStats:
@@ -96,7 +101,8 @@ class Arm:
         self.view = None
         self.sim_view = None
         self.last_error = ''
-        self.q_last: np.ndarray | None = None
+        #: The last VELOCITY_WINDOW_STEPS + 1 positions and their times, for the velocity.
+        self.history: deque[tuple[float, np.ndarray]] = deque(maxlen=VELOCITY_WINDOW_STEPS + 1)
 
     def on_command(self, msg: JointState) -> None:
         """Take position targets (rclpy thread); non-finite ones are ignored."""
@@ -134,16 +140,16 @@ class Arm:
                 self.mimics.append((self.index[name], self.index[mimic[0]], mimic[1], mimic[2]))
         self.free = [i for i in range(len(self.names)) if i not in {m[0] for m in self.mimics}]
         self.articulations = np.array([0], dtype=np.int32)
-        self.q_last = None
+        self.history.clear()
         self.view = view
         self.log.info(f'Arm articulation view ready: joints {self.names}')
 
-    def step(self, dt_s: float, t_s: float) -> None:
+    def step(self, t_s: float) -> None:
         """Run one control step after a physics step; a failure drops the views for a rebuild."""
         if self.view is None:
             return
         try:
-            self._control(dt_s, t_s)
+            self._control(t_s)
             self.last_error = ''
         except Exception as error:  # noqa: BLE001 - the physics callback must survive a stale view
             if str(error) != self.last_error:
@@ -151,7 +157,7 @@ class Arm:
                 self.log.warning(f'Arm step failed, rebuilding the views: {traceback.format_exc()}')
             self.view = None
 
-    def _control(self, dt_s: float, t_s: float) -> None:
+    def _control(self, t_s: float) -> None:
         with self.lock:
             command = dict(self.command)
         positions = self.view.get_dof_positions()
@@ -169,9 +175,10 @@ class Arm:
         self.view.set_dof_position_targets(targets, self.articulations)
         q = positions[0].astype(float)
         # PhysX's velocities stay off zero on a joint its drive holds against a load: the change
-        # in position is the motion.
-        qd = np.zeros_like(q) if self.q_last is None or dt_s <= 0.0 else (q - self.q_last) / dt_s
-        self.q_last = q
+        # in position over the window is the motion.
+        self.history.append((t_s, q))
+        t0, q0 = self.history[0]
+        qd = np.zeros_like(q) if t_s <= t0 else (q - q0) / (t_s - t0)
         effort = self.view.get_dof_projected_joint_forces()[0].astype(float)
         msg = JointState(name=[self.names[i] for i in self.free])
         msg.header.stamp = Time(seconds=t_s).to_msg()
@@ -296,13 +303,13 @@ def run(app, cfg: dict, stop: threading.Event) -> None:
         pub_clock = node.create_publisher(Clock, '/clock', QOS_CLOCK)
         stats = StepStats()
 
-        def on_physics_step(dt_s: float, _context) -> None:
+        def on_physics_step(_dt_s: float, _context) -> None:
             started = time.perf_counter()
             t_s = SimulationManager.get_simulation_time()
             # A twin runs beside a stack on the wall clock: its clock would confuse that stack.
             if shadow is None:
                 pub_clock.publish(Clock(clock=Time(seconds=t_s).to_msg()))
-            arm.step(dt_s, t_s)
+            arm.step(t_s)
             stats.add(time.perf_counter() - started)
 
         physics_hz, render_hz = cfg['app']['physics_hz'], cfg['app']['render_hz']

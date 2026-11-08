@@ -4,8 +4,9 @@ Run inside the sim image (``scripts/run/sim.sh`` does):
 
     /isaac-sim/python.sh /piper-stack/sim/sim.py --config /piper-stack/sim/config/sim.yaml
 
-HEADLESS (true or false), PHYSICS_ENGINE (physx or newton) and SIM_MODE (control or shadow)
-override app.headless, app.engine and app.mode. Python because Isaac Sim's scripting API is Python.
+HEADLESS and LIVESTREAM (true or false), PHYSICS_ENGINE (physx or newton) and SIM_MODE (control
+or shadow) override app.headless, app.livestream.enabled, app.engine and app.mode. Python because
+Isaac Sim's scripting API is Python.
 """
 
 from __future__ import annotations
@@ -26,11 +27,11 @@ MODES = ('control', 'shadow')
 
 
 def load_config(path: str) -> dict:
-    """Return sim.yaml with the HEADLESS, PHYSICS_ENGINE and SIM_MODE overrides applied.
+    """Return sim.yaml with the HEADLESS, LIVESTREAM, PHYSICS_ENGINE and SIM_MODE overrides applied.
 
     Raises:
-        ValueError: If the engine is neither physx nor newton, or the mode neither control nor
-            shadow.
+        ValueError: If the engine is neither physx nor newton, the mode neither control nor shadow,
+            or the livestream is on without headless (the stream replaces the window).
     """
     with open(path) as f:
         cfg = yaml.safe_load(f)
@@ -38,13 +39,31 @@ def load_config(path: str) -> dict:
         cfg['app']['headless'] = os.getenv('HEADLESS') == 'true'
     if os.getenv('PHYSICS_ENGINE'):
         cfg['app']['engine'] = os.getenv('PHYSICS_ENGINE')
+    if os.getenv('LIVESTREAM'):
+        cfg['app']['livestream']['enabled'] = os.getenv('LIVESTREAM') == 'true'
     if os.getenv('SIM_MODE'):
         cfg['app']['mode'] = os.getenv('SIM_MODE')
     if cfg['app']['engine'] not in ENGINES:
         raise ValueError(f'app.engine {cfg["app"]["engine"]!r} is not one of {ENGINES}')
     if cfg['app']['mode'] not in MODES:
         raise ValueError(f'app.mode {cfg["app"]["mode"]!r} is not one of {MODES}')
+    if cfg['app']['livestream']['enabled'] and not cfg['app']['headless']:
+        raise ValueError('The livestream replaces the local window: it needs HEADLESS=true')
     return cfg
+
+
+def start_livestream(app, stream: dict) -> None:
+    """Stream the app's UI over WebRTC on the ports of sim.yaml's app.livestream."""
+    import isaacsim.core.experimental.utils.app as app_utils
+
+    prefix = '/exts/omni.kit.livestream.app/primaryStream'
+    app.set_setting(f'{prefix}/signalPort', int(stream['signal_port']))
+    app.set_setting(f'{prefix}/streamPort', int(stream['stream_port']))
+    if stream['public_ip']:
+        app.set_setting(f'{prefix}/publicIp', str(stream['public_ip']))
+    # The remote user's pointer is drawn into the stream.
+    app.set_setting('/app/window/drawMouse', True)
+    app_utils.enable_extension('omni.kit.livestream.app')
 
 
 def main() -> None:
@@ -67,9 +86,12 @@ def main() -> None:
     from isaacsim import SimulationApp
 
     engine = cfg['app']['engine']
+    stream = cfg['app']['livestream']
     app = SimulationApp(
         {
             'headless': cfg['app']['headless'],
+            # The stream shows the UI, which a headless app otherwise does not build.
+            'hide_ui': not stream['enabled'],
             'renderer': 'RayTracedLighting',
             # The engine is chosen at start, and Newton's extension must not switch to itself.
             'extra_args': [
@@ -82,6 +104,12 @@ def main() -> None:
     try:
         import isaacsim.core.experimental.utils.app as app_utils
 
+        if stream['enabled']:
+            start_livestream(app, stream)
+            logger.info(
+                f'Livestream on: WebRTC signalling {stream["signal_port"]}/tcp, media '
+                f'{stream["stream_port"]}/udp'
+            )
         for ext in EXTENSIONS:
             app_utils.enable_extension(ext)
         if engine == 'newton':

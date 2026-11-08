@@ -45,6 +45,11 @@ starts Isaac Sim as its digital twin: the simulated arm follows `/joint_states`,
 state on `/shadow/joint_states` and renders its wrist camera under `/shadow/wrist_camera`, next to
 the real camera's images. The twin publishes no `/clock` and has no cubes.
 
+For a simulator on another machine (a GPU server), `LIVESTREAM=true ./scripts/run/sim.sh moveit`
+streams Isaac Sim's UI over WebRTC instead of rendering to a window: connect NVIDIA's Isaac Sim
+WebRTC Streaming Client to that machine (49100/tcp and 47998/udp). The stream has no
+authentication, so keep it on a trusted network. On the real arm everything runs on the local PC.
+
 ### Recording and plots
 
 ```bash

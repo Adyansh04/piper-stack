@@ -3,6 +3,16 @@
 app:
   # HEADLESS (true or false) overrides this.
   headless: true
+  # true: no local window; Isaac Sim's whole UI goes over WebRTC to NVIDIA's Isaac Sim WebRTC
+  # Streaming Client (for a simulator on a server). Needs headless: true; LIVESTREAM overrides it.
+  # The client needs signal_port/tcp and stream_port/udp to this host; there is no authentication,
+  # so keep it on a trusted network.
+  livestream:
+    enabled: false
+    signal_port: 49100
+    stream_port: 47998
+    # The address clients reach this host at when it is none of its own (behind a NAT); "": unset.
+    public_ip: ""
   # control: the stack drives the arm (hardware:=isaac). shadow: a digital twin, the arm follows
   # the joint states of a stack on the real (or mock) arm, with no /clock, no cubes and its camera
   # beside the real one (the shadow section). SIM_MODE overrides this.
@@ -37,11 +47,12 @@ world:
     colour: [0.62, 0.48, 0.33]
   # Friction of the cubes (PLA on the table and the gripper's pads).
   cube_friction: {static: 0.8, dynamic: 0.6}
-  # 5 cm cubes in front of the arm, [x_m, y_m] on the table.
+  # 5 cm cubes in front of the arm, [x_m, y_m] on the table, within its reach from above (the
+  # gripper pointing down reaches 0.08 m over the top up to about 0.33 m from the base).
   cubes:
     - {name: red_cube, colour: [0.8, 0.1, 0.1], size_m: 0.05, xy_m: [0.30, -0.10], mass_kg: 0.05}
     - {name: green_cube, colour: [0.1, 0.65, 0.2], size_m: 0.05, xy_m: [0.30, 0.10], mass_kg: 0.05}
-    - {name: blue_cube, colour: [0.1, 0.25, 0.8], size_m: 0.05, xy_m: [0.38, 0.0], mass_kg: 0.05}
+    - {name: blue_cube, colour: [0.1, 0.25, 0.8], size_m: 0.05, xy_m: [0.34, 0.0], mass_kg: 0.05}
     - {name: yellow_cube, colour: [0.9, 0.8, 0.1], size_m: 0.05, xy_m: [0.24, 0.0], mass_kg: 0.05}
   # Simulation time between two ground truth messages (sim/objects), seconds.
   ground_truth_period_s: 0.5
