@@ -128,7 +128,9 @@ def render(app, cfg: dict, args: argparse.Namespace) -> None:
     sun.CreateAngleAttr(1.0)
     sun.AddRotateXYZOp().Set(Gf.Vec3f(35.0, 0.0, 30.0))
     r = cfg['robot']
-    usd, _ = robot.import_robot(Path(r['urdf']), Path(r['usd_cache']), r['packages'], r['drives'])
+    usd, urdf = robot.import_robot(
+        Path(r['urdf']), Path(r['usd_cache']), r['packages'], r['drives']
+    )
     arm = stage.DefinePrim(Sdf.Path('/World/piper'), 'Xform')
     arm.GetReferences().AddReference(usd)
     engine = cfg['app']['engine']
@@ -151,7 +153,8 @@ def render(app, cfg: dict, args: argparse.Namespace) -> None:
         sensors.define_camera(stage, path, T, VIEW_CAMERA)
         cameras[name] = (path, VIEW_CAMERA)
     overhead = cfg['overhead_camera']
-    T = task_spec.pose_matrix(overhead['xyz_m'], overhead['rpy_deg'])
+    # The robot's base, and so its world frame, is the stage's origin.
+    _, T = robot.frame_in_body(urdf, overhead['frame'])
     sensors.define_camera(stage, '/World/Preview/overhead', T, overhead)
     cameras['overhead'] = ('/World/Preview/overhead', overhead)
 

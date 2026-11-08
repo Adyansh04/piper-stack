@@ -22,6 +22,7 @@ xacro "$(ros2 pkg prefix piper_description)/share/piper_description/urdf/piper.u
 | `motion_mode` | `joint` | `joint`, `cpv` or `mit` (MIT adds velocity and effort command interfaces) |
 | `collision_level`, `end_load` | `-1`, empty | Set at activation; the defaults keep the firmware's |
 | `wrist_camera` | `true` | The camera mount and the camera's frames |
+| `overhead_camera` | `true` | The overhead camera's optical frame in `world`, at `overhead_camera_xyz` (m) and `overhead_camera_rpy` (rad): 1 m above the work area, looking down |
 | `prefix` | empty | Prefix of every link and joint name |
 
 ## Frames
@@ -32,6 +33,9 @@ named as Percipio's driver names them (`wrist_camera_link`, `wrist_camera_color_
 `wrist_camera_color_optical_frame`, `wrist_camera_depth_frame`, `wrist_camera_depth_optical_frame`),
 so the driver runs with `publish_tf:=false` next to `robot_state_publisher`. The lens offsets inside
 the camera are estimates until the hand-eye calibration at the arm.
+
+The overhead RGB camera has one frame, `overhead_camera_color_optical_frame`, fixed in `world`;
+calibration of the real camera sets its pose through the two arguments.
 
 ## Meshes
 

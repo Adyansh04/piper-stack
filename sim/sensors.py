@@ -76,7 +76,7 @@ def define_camera(stage: Usd.Stage, path: str, T_optical: np.ndarray, cfg: dict)
 def add_camera(
     stage: Usd.Stage, path: str, T_optical: np.ndarray, cfg: dict, render_hz: float
 ) -> None:
-    """Add the wrist camera and its publishers.
+    """Add a camera and its publishers: colour, and depth aligned to it when ``cfg['depth']``.
 
     The image has the real colour camera's focal length with the principal point at its centre
     and no distortion; the camera info describes exactly that image.
@@ -85,7 +85,7 @@ def add_camera(
         stage: The stage.
         path: The camera's prim path, under the body that carries it.
         T_optical: The colour optical frame in that body (z forward, x right, y down).
-        cfg: sim.yaml's ``camera`` section.
+        cfg: sim.yaml's ``camera`` or ``overhead_camera`` section.
         render_hz: Frames rendered a second.
     """
     define_camera(stage, path, T_optical, cfg)
@@ -94,9 +94,10 @@ def add_camera(
     helpers = {
         'Rgb': ('color/image_raw', 'rgb', cfg['color_frame_id']),
         'RgbInfo': ('color/camera_info', None, cfg['color_frame_id']),
-        'Depth': ('depth/image_raw', 'depth', cfg['depth_frame_id']),
-        'DepthInfo': ('depth/camera_info', None, cfg['depth_frame_id']),
     }
+    if cfg['depth']:
+        helpers['Depth'] = ('depth/image_raw', 'depth', cfg['depth_frame_id'])
+        helpers['DepthInfo'] = ('depth/camera_info', None, cfg['depth_frame_id'])
     values = [
         ('RenderProduct.inputs:cameraPrim', [usdrt.Sdf.Path(path)]),
         ('RenderProduct.inputs:width', width_px),

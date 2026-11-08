@@ -366,6 +366,17 @@ def run(app, cfg: dict, stop: threading.Event) -> None:
                 camera,
                 float(cfg['app']['render_hz']),
             )
+        overhead = cfg['overhead_camera']
+        # A twin's overhead view is the real camera's.
+        if overhead['enabled'] and not shadow:
+            body, T = robot.frame_in_body(urdf, overhead['frame'])
+            sensors.add_camera(
+                stage,
+                f'{find_body(stage, "/World/piper", body)}/overhead_camera',
+                T,
+                overhead,
+                float(cfg['app']['render_hz']),
+            )
         pub_clock = node.create_publisher(Clock, '/clock', QOS_CLOCK)
         stats = StepStats()
 

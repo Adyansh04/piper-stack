@@ -1,0 +1,14 @@
+<?xml version="1.0"?>
+<!-- The overhead RGB camera: a standard USB camera on a stand above the work area. Only its colour
+     optical frame (z forward, x right, y down), fixed in the parent at xyz (m) and rpy (rad); the
+     simulator renders from it and calibration sets it on the real setup. -->
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro">
+  <xacro:macro name="piper_overhead_camera" params="parent name xyz rpy">
+    <link name="${name}_color_optical_frame"/>
+    <joint name="${name}_joint" type="fixed">
+      <parent link="${parent}"/>
+      <child link="${name}_color_optical_frame"/>
+      <origin xyz="${xyz}" rpy="${rpy}"/>
+    </joint>
+  </xacro:macro>
+</robot>

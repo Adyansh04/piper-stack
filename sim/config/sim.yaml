@@ -70,6 +70,8 @@ camera:
   namespace: wrist_camera
   color_frame_id: wrist_camera_color_optical_frame
   depth_frame_id: wrist_camera_depth_optical_frame
+  # Colour and depth aligned to it, as the real camera.
+  depth: true
   # The real camera's default mode (camera.launch.py) and its colour camera's focal length there
   # (factory calibration 803.1 px at 1280 x 960). The sim's principal point is centred and its
   # image undistorted; its camera_info says so.
@@ -93,12 +95,15 @@ newton:
   njmax: 2000
   nconmax: 1000
 
-# The overhead RGB camera: a standard USB camera on a stand above the work area, looking straight
-# down with the image's top away from the arm. Its optical frame (z forward, x right, y down) in
-# the world frame: xyz in metres, rpy in degrees (fixed axes, as in URDF).
+# The overhead RGB camera: a standard USB camera on a stand above the work area. Its optical frame
+# is in the robot description (piper.urdf.xacro's overhead_camera args: 1 m above the table,
+# looking straight down); it publishes as a USB camera driver does, colour only.
 overhead_camera:
-  xyz_m: [0.3, 0.0, 1.0]
-  rpy_deg: [180.0, 0.0, -90.0]
+  enabled: true
+  frame: overhead_camera_color_optical_frame
+  namespace: overhead_camera
+  color_frame_id: overhead_camera_color_optical_frame
+  depth: false
   width_px: 1280
   height_px: 720
   # A 70 degree horizontal field of view.

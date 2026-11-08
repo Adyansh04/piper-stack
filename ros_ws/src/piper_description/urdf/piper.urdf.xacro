@@ -2,7 +2,10 @@
 <!-- The Piper with its gripper and its ros2_control system, fixed to the world frame.
      Arguments: prefix (link and joint names), hardware (mock|can|isaac), can_interface,
      enable_on_activate (true|false), speed_percent, wrist_camera (true|false),
-     motion_mode (joint|cpv|mit), collision_level (-1|0-8), end_load (|empty|half|full). -->
+     motion_mode (joint|cpv|mit), collision_level (-1|0-8), end_load (|empty|half|full),
+     overhead_camera (true|false) with its optical frame's overhead_camera_xyz (m) and
+     overhead_camera_rpy (rad) in world: 1 m above the work area, looking down, the image's top
+     away from the arm. -->
 <robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="piper">
   <xacro:arg name="prefix" default=""/>
   <xacro:arg name="hardware" default="mock"/>
@@ -13,10 +16,14 @@
   <xacro:arg name="motion_mode" default="joint"/>
   <xacro:arg name="collision_level" default="-1"/>
   <xacro:arg name="end_load" default=""/>
+  <xacro:arg name="overhead_camera" default="true"/>
+  <xacro:arg name="overhead_camera_xyz" default="0.3 0 1.0"/>
+  <xacro:arg name="overhead_camera_rpy" default="${pi} 0 ${-pi / 2}"/>
 
   <xacro:include filename="$(find piper_description)/urdf/piper_arm.xacro"/>
   <xacro:include filename="$(find piper_description)/urdf/piper.ros2_control.xacro"/>
   <xacro:include filename="$(find piper_description)/urdf/piper_wrist_camera.xacro"/>
+  <xacro:include filename="$(find piper_description)/urdf/piper_overhead_camera.xacro"/>
 
   <link name="world"/>
   <joint name="$(arg prefix)world_joint" type="fixed">
@@ -28,6 +35,11 @@
   <xacro:if value="$(arg wrist_camera)">
     <xacro:piper_wrist_camera prefix="$(arg prefix)" parent="$(arg prefix)gripper_base"
                               name="wrist_camera"/>
+  </xacro:if>
+  <xacro:if value="$(arg overhead_camera)">
+    <xacro:piper_overhead_camera parent="world" name="$(arg prefix)overhead_camera"
+                                 xyz="$(arg overhead_camera_xyz)"
+                                 rpy="$(arg overhead_camera_rpy)"/>
   </xacro:if>
   <xacro:piper_ros2_control prefix="$(arg prefix)" hardware="$(arg hardware)"
                             can_interface="$(arg can_interface)"

@@ -53,5 +53,8 @@ cameras, Newton's solver settings and the joint drives, with a comment on each v
 - `/clock`, and `/isaac_joint_states` for `ros2_control` (it takes `/isaac_joint_commands`).
 - `/wrist_camera/color/image_raw`, `/wrist_camera/depth/image_raw` (32FC1 metres, aligned to colour)
   and their `camera_info`, as Percipio's driver names them.
+- `/overhead_camera/color/image_raw` and its `camera_info` (1280 x 720, 70 degree field of view),
+  as a USB camera driver names them: the overhead RGB camera, 1 m above the table looking down, in
+  `overhead_camera_color_optical_frame` (the robot description holds its pose).
 - `/sim/objects`: the cubes' or the task parts' poses in `world` (TFMessage), the ground truth for
   tests and for scripted experts.
