@@ -11,6 +11,8 @@
 
   <exec_depend>controller_manager</exec_depend>
   <exec_depend>joint_state_broadcaster</exec_depend>
+  <!-- hardware:=isaac: the simulator over its joint topics. -->
+  <exec_depend>joint_state_topic_hardware_interface</exec_depend>
   <exec_depend>joint_trajectory_controller</exec_depend>
   <exec_depend>parallel_gripper_controller</exec_depend>
   <exec_depend>percipio_camera</exec_depend>

@@ -6,6 +6,8 @@ Commanding the real arm, firmware speed at 10 %:
     ros2 launch piper_bringup bringup.launch.py hardware:=can enable:=true motion:=true
 Without the arm, planning and jogging in RViz:
     ros2 launch piper_bringup bringup.launch.py hardware:=mock motion:=true moveit:=true rviz:=true
+Against Isaac Sim (sim/sim.py running), on its clock:
+    ros2 launch piper_bringup bringup.launch.py hardware:=isaac motion:=true moveit:=true
 """
 
 from launch import LaunchDescription
@@ -15,6 +17,7 @@ from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import (
     AndSubstitution,
     Command,
+    EqualsSubstitution,
     LaunchConfiguration,
     NotSubstitution,
     PathJoinSubstitution,
@@ -29,6 +32,8 @@ def generate_launch_description():
     motion = LaunchConfiguration('motion')
     moveit = LaunchConfiguration('moveit')
     rviz = LaunchConfiguration('rviz')
+    # The simulator's clock drives every node of the stack, or none.
+    use_sim_time = EqualsSubstitution(hardware, 'isaac')
 
     robot_description = ParameterValue(
         Command(
@@ -75,8 +80,9 @@ def generate_launch_description():
             DeclareLaunchArgument(
                 'hardware',
                 default_value='mock',
-                choices=['mock', 'can'],
-                description='mock: ros2_control mock, no arm. can: the real arm over CAN.',
+                choices=['mock', 'can', 'isaac'],
+                description='mock: ros2_control mock, no arm. can: the real arm over CAN. isaac: '
+                'the arm in Isaac Sim (sim/sim.py), over its joint topics and on its clock.',
             ),
             DeclareLaunchArgument(
                 'can_interface',
@@ -130,13 +136,13 @@ def generate_launch_description():
             Node(
                 package='robot_state_publisher',
                 executable='robot_state_publisher',
-                parameters=[{'robot_description': robot_description}],
+                parameters=[{'robot_description': robot_description, 'use_sim_time': use_sim_time}],
                 output='screen',
             ),
             Node(
                 package='controller_manager',
                 executable='ros2_control_node',
-                parameters=[controllers],
+                parameters=[controllers, {'use_sim_time': use_sim_time}],
                 remappings=[('~/robot_description', '/robot_description')],
                 output='screen',
             ),
@@ -149,7 +155,11 @@ def generate_launch_description():
                         [FindPackageShare('piper_moveit_config'), 'launch', 'moveit.launch.py']
                     )
                 ),
-                launch_arguments={'servo': LaunchConfiguration('servo'), 'rviz': rviz}.items(),
+                launch_arguments={
+                    'servo': LaunchConfiguration('servo'),
+                    'rviz': rviz,
+                    'use_sim_time': use_sim_time,
+                }.items(),
                 condition=IfCondition(moveit),
             ),
             Node(

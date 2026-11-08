@@ -1,6 +1,7 @@
 <?xml version="1.0"?>
-<!-- The Piper's ros2_control system. hardware: mock (ros2_control's mock, no arm) or can (the real
-     arm through piper_hardware). Position limits are the tighter of the URDF's and the firmware's. -->
+<!-- The Piper's ros2_control system. hardware: mock (ros2_control's mock, no arm), can (the real
+     arm through piper_hardware) or isaac (the arm in Isaac Sim, over its joint topics). Position
+     limits are the tighter of the URDF's and the firmware's. -->
 <robot xmlns:xacro="http://www.ros.org/wiki/xacro">
   <xacro:macro name="piper_joint" params="name lower upper mit:=false">
     <joint name="${name}">
@@ -26,6 +27,12 @@
       <hardware>
         <xacro:if value="${hardware == 'mock'}">
           <plugin>mock_components/GenericSystem</plugin>
+        </xacro:if>
+        <xacro:if value="${hardware == 'isaac'}">
+          <plugin>joint_state_topic_hardware_interface/JointStateTopicSystem</plugin>
+          <!-- sim/simulator.py's topics; it follows the targets with its joint drives. -->
+          <param name="joint_commands_topic">/isaac_joint_commands</param>
+          <param name="joint_states_topic">/isaac_joint_states</param>
         </xacro:if>
         <xacro:if value="${hardware == 'can'}">
           <plugin>piper_hardware/PiperSystem</plugin>

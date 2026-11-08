@@ -1,6 +1,6 @@
 <?xml version="1.0"?>
 <!-- The Piper with its gripper and its ros2_control system, fixed to the world frame.
-     Arguments: prefix (link and joint names), hardware (mock|can), can_interface,
+     Arguments: prefix (link and joint names), hardware (mock|can|isaac), can_interface,
      enable_on_activate (true|false), speed_percent, wrist_camera (true|false),
      motion_mode (joint|cpv|mit), collision_level (-1|0-8), end_load (|empty|half|full). -->
 <robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="piper">

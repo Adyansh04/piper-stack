@@ -88,6 +88,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends shellcheck \
     && rm -rf /var/lib/apt/lists/* \
     && UV_TOOL_DIR=/opt/uv-tools UV_TOOL_BIN_DIR=/usr/local/bin uv tool install "ruff==${RUFF_VERSION}"
 
+# The simulator's ros2_control hardware (hardware:=isaac): joint commands and states over topics.
+# Late in the file, so adding it did not rebuild the layers above.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        ros-lyrical-joint-state-topic-hardware-interface \
+    && rm -rf /var/lib/apt/lists/*
+
 # The container runs as the host user so that files it writes in the checkout stay the user's: the
 # base image's own user `ubuntu` takes the host's IDs.
 ARG HOST_UID=1000
