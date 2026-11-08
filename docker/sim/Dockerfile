@@ -39,7 +39,7 @@ ENV UV_PYTHON=/opt/isaaclab-venv/bin/python \
     MUJOCO_GL=disable \
     HUB__ARGS__DETECT_ONLY=false
 
-# The container runs as the host user (compose `user:`, Apptainer's own user), so files it writes
+# The container runs as the host user (compose `user:`), so files it writes
 # in the checkout stay the user's: the directories Kit writes are created open to any user.
 ENV HOME=/home/sim
 RUN mkdir -p /isaac-sim/kit/cache /isaac-sim/kit/logs /isaac-sim/kit/data /home/sim \
