@@ -22,6 +22,12 @@ log = logging.getLogger('sim.world')
 QOS_GROUND_TRUTH = QoSProfile(depth=10, reliability=ReliabilityPolicy.RELIABLE)
 
 
+def _pose_xyzw(T: np.ndarray) -> list[float]:
+    """Return a 4 x 4 transform as its translation and quaternion: x, y, z, qx, qy, qz, qw."""
+    q = Gf.Matrix4d(*np.asarray(T, dtype=float).T.flatten()).ExtractRotationQuat()
+    return [*(float(v) for v in T[:3, 3]), *q.GetImaginary(), q.GetReal()]
+
+
 def host_array(values) -> np.ndarray:
     """Return a physics tensor as a NumPy array: PhysX's CPU views give NumPy, Newton's Warp."""
     return values.numpy() if hasattr(values, 'numpy') else np.asarray(values)
@@ -101,11 +107,21 @@ class GroundTruth:
         node: The simulator's node.
         objects: Each object's name and the prim path of its rigid body.
         period_s: Simulation time between two messages.
+        fixed: Static objects' world poses (4 x 4 transforms) by name, sent with every message.
     """
 
-    def __init__(self, node: Node, objects: list[tuple[str, str]], period_s: float) -> None:
-        self.names = [name for name, _ in objects]
+    def __init__(
+        self,
+        node: Node,
+        objects: list[tuple[str, str]],
+        period_s: float,
+        fixed: dict[str, np.ndarray] | None = None,
+    ) -> None:
+        fixed = fixed or {}
+        self.names = [name for name, _ in objects] + list(fixed)
         self.paths = [path for _, path in objects]
+        # As the physics views give them: x, y, z, qx, qy, qz, qw.
+        self.fixed = np.array([_pose_xyzw(T) for T in fixed.values()]).reshape(-1, 7)
         self.period_s = period_s
         self.next_s = 0.0
         self.last_s = 0.0
@@ -124,7 +140,7 @@ class GroundTruth:
         if self.sim_view is not sim_view:
             self.view, self.sim_view = sim_view.create_rigid_body_view(self.paths), sim_view
         self.next_s = t_s + self.period_s
-        poses = host_array(self.view.get_transforms()).astype(float)
+        poses = np.vstack((host_array(self.view.get_transforms()), self.fixed)).astype(float)
         stamp = Time(seconds=t_s).to_msg()
         msg = TFMessage()
         for name, pose in zip(self.names, poses, strict=True):

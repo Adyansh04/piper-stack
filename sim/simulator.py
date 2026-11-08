@@ -332,8 +332,10 @@ def run(app, cfg: dict, stop: threading.Event) -> None:
         objects = world.build(
             stage, {**cfg['world'], 'cubes': []} if shadow or task else cfg['world']
         )
+        fixed = {}
         if task and not shadow:
             spec = task_spec.load(Path(cfg['world']['tasks_dir']) / task)
+            fixed = spec.fixed
             files = task_usd.build(spec, Path(r['usd_cache']).parent / 'tasks')
             bodies = task_usd.body_paths(spec, task_usd.add(stage, spec, files))
             objects += list(bodies.items())
@@ -353,7 +355,9 @@ def run(app, cfg: dict, stop: threading.Event) -> None:
         arm = Arm(
             node, articulation_root=root, urdf=urdf, engine=cfg['app']['engine'], shadow=shadow
         )
-        truth = world.GroundTruth(node, objects, float(cfg['world']['ground_truth_period_s']))
+        truth = world.GroundTruth(
+            node, objects, float(cfg['world']['ground_truth_period_s']), fixed
+        )
         camera = cfg['camera']
         if shadow:
             camera = {**camera, 'namespace': shadow['camera_namespace']}
