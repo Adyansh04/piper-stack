@@ -8,6 +8,8 @@ controller_manager:
       type: joint_trajectory_controller/JointTrajectoryController
     gripper_controller:
       type: parallel_gripper_action_controller/GripperActionController
+    policy_controller:
+      type: piper_controllers/PolicyController
 
 joint_state_broadcaster:
   ros__parameters:
@@ -40,3 +42,24 @@ gripper_controller:
     allow_stalling: true
     stall_timeout: 1.0
     stall_velocity_threshold: 0.005
+
+# A trained reach policy (piper_controllers), spawned inactive with bringup's policy:=<onnx file>.
+# The reach task in lab/ trains with these values (it reads this section), so a policy and this
+# controller always agree.
+policy_controller:
+  ros__parameters:
+    joints: [joint1, joint2, joint3, joint4, joint5, joint6]
+    # Set by the launch (policy:=).
+    model_path: ""
+    # The frame of the targets on ~/target_pose: the robot's base.
+    frame: "base_link"
+    # Policy steps a second; the update rate (200 Hz) must be a whole multiple.
+    policy_rate_hz: 50.0
+    # Wanted joint positions at a zero action (rad: SRDF ready), and their change per unit of
+    # action (rad).
+    action_offset: [0.0, 1.32, -1.14, 0.0, 1.1, 0.0]
+    action_scale: 0.5
+    # Caps of the commanded joint motion: a third of the firmware's 3 rad/s, in rad/s, and the
+    # firmware's own acceleration cap, in rad/s^2.
+    max_velocity: 1.0
+    max_acceleration: 0.5

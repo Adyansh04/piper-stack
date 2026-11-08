@@ -32,6 +32,8 @@ variants with `--help`, and `--print` lists the commands instead of opening them
 - `enable`: `hardware:=can` only; `false` (the default) sends nothing to the arm.
 - `motion`: also start the arm and gripper controllers; `moveit`, `servo`, `rviz` add those.
 - `motion_mode`: `joint` (MOVE J), `cpv` or `mit` on the real arm; `speed_percent` scales MOVE J.
+- `policy`: a trained reach policy (`policy.onnx`) for `piper_controllers`' policy controller,
+  loaded inactive; switch it in for `arm_controller` to use it (see its README).
 
 ## Recording
 
@@ -67,7 +69,9 @@ Then stream with the ROS 2 topic subscriber, or open a bag with `-d <bag>/<file>
 ## Parameters
 
 - `config/controllers.yaml`: the controller_manager's 200 Hz loop, the joint trajectory controller
-  (goal time, stopped velocity) and the gripper controller (goal tolerance, stall detection).
+  (goal time, stopped velocity), the gripper controller (goal tolerance, stall detection) and the
+  policy controller (joints, action offsets and scale, motion caps, policy rate; the Isaac Lab
+  task in `lab/` trains with these).
 - `config/record/*.yaml`: the recording profiles above.
 - `config/plotjuggler/arm.pj4.xml`: the PlotJuggler 4 layout above.
 

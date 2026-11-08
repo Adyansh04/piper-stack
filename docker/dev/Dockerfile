@@ -51,8 +51,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         ros-lyrical-tf2-sensor-msgs \
     && rm -rf /var/lib/apt/lists/*
 
-# CUDA 13 and TensorRT 11 from NVIDIA's Ubuntu 26.04 repository: SAM 3.1 and the policies run as
-# TensorRT engines from C++.
+# CUDA 13 and TensorRT 11 from NVIDIA's Ubuntu 26.04 repository: SAM 3.1 runs as TensorRT
+# engines from C++.
 ARG CUDA_VERSION=13-4
 ARG TENSORRT_VERSION=11.4.0.106-1+cuda13.4
 RUN wget -q https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2604/x86_64/cuda-keyring_1.1-1_all.deb \
@@ -114,6 +114,11 @@ RUN if [ "$(dpkg --print-architecture)" = amd64 ]; then \
         && fetch data_load_mcap%2Fv1.3.0/mcap-loader-1.3.0-linux-x86_64.zip \
             d58dc3ab1af06783d8bf0ce3a488b18ff480ac3fbea4f6e2425d30230eee4038; \
     fi
+
+# ONNX Runtime (CPU) for the policy controller in piper_controllers, which runs trained policies
+# inside the control loop.
+RUN apt-get update && apt-get install -y --no-install-recommends ros-lyrical-onnxruntime-vendor \
+    && rm -rf /var/lib/apt/lists/*
 
 # The container runs as the host user so that files it writes in the checkout stay the user's: the
 # base image's own user `ubuntu` takes the host's IDs.

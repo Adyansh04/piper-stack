@@ -18,7 +18,7 @@ From the motors up:
 | Layer | Packages | What it does |
 |---|---|---|
 | CAN | `piper_driver` | The Piper's protocol V2 over SocketCAN, without ROS |
-| Control | `piper_hardware`, `piper_bringup` | `ros2_control`: the hardware system, a joint trajectory controller and a gripper controller at 200 Hz |
+| Control | `piper_hardware`, `piper_controllers`, `piper_bringup` | `ros2_control`: the hardware system, a joint trajectory controller, a gripper controller and a trained reach policy (ONNX) at 200 Hz |
 | Description | `piper_description`, `piper_moveit_config` | The URDF with the wrist camera, MoveIt's groups, pick_ik, OMPL, Pilz, Servo |
 | Perception | `piper_perception` | SAM 3.1 segmentation (TensorRT, C++) and GraspGenX grasps (a Python server behind a C++ service) |
 | Skills | `piper_skills` | Named poses, views, find, pick, place, place target: one action or service each |
@@ -46,6 +46,10 @@ Its RTX wrist camera publishes the topics Percipio's driver publishes on the rea
 same frames, at the real camera's default resolution and focal length, so the perception and the
 skills see no difference. In shadow mode the
 simulator is a digital twin instead: it follows the real arm's `/joint_states`.
+
+Isaac Lab (`lab/`) trains on the same robot USD, drives and table, and with the policy
+controller's own motion law and parameters (`controllers.yaml`), so a policy exported to ONNX runs
+unchanged in `piper_controllers`' policy controller on any of the three systems.
 
 ## 3. A pick and place, step by step
 

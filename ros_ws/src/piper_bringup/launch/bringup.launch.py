@@ -19,6 +19,7 @@ from launch.substitutions import (
     Command,
     EqualsSubstitution,
     LaunchConfiguration,
+    NotEqualsSubstitution,
     NotSubstitution,
     PathJoinSubstitution,
 )
@@ -32,6 +33,7 @@ def generate_launch_description():
     motion = LaunchConfiguration('motion')
     moveit = LaunchConfiguration('moveit')
     rviz = LaunchConfiguration('rviz')
+    policy = LaunchConfiguration('policy')
     # The simulator's clock drives every node of the stack, or none.
     use_sim_time = EqualsSubstitution(hardware, 'isaac')
 
@@ -60,7 +62,7 @@ def generate_launch_description():
         [FindPackageShare('piper_bringup'), 'config', 'controllers.yaml']
     )
 
-    def spawner(name, condition=None):
+    def spawner(name, condition=None, extra=()):
         return Node(
             package='controller_manager',
             executable='spawner',
@@ -71,6 +73,7 @@ def generate_launch_description():
                 '/controller_manager',
                 '--param-file',
                 controllers,
+                *extra,
             ],
             condition=condition,
         )
@@ -128,6 +131,13 @@ def generate_launch_description():
                 description='moveit:=true only. true: also start MoveIt Servo for jogging.',
             ),
             DeclareLaunchArgument(
+                'policy',
+                default_value='',
+                description='A trained reach policy (policy.onnx, with its policy.onnx.data beside '
+                "it): load piper_controllers' policy_controller with it, inactive until switched "
+                'in for arm_controller. Empty: no policy controller.',
+            ),
+            DeclareLaunchArgument(
                 'rviz',
                 default_value='false',
                 choices=['true', 'false'],
@@ -149,6 +159,12 @@ def generate_launch_description():
             spawner('joint_state_broadcaster'),
             spawner('arm_controller', IfCondition(motion)),
             spawner('gripper_controller', IfCondition(motion)),
+            spawner(
+                'policy_controller',
+                IfCondition(NotEqualsSubstitution(policy, '')),
+                # One argument: the spawner would read a separate '-p ...' as its own option.
+                extra=['--inactive', ['--controller-ros-args=-p model_path:=', policy]],
+            ),
             IncludeLaunchDescription(
                 PythonLaunchDescriptionSource(
                     PathJoinSubstitution(

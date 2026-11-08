@@ -50,6 +50,12 @@ streams Isaac Sim's UI over WebRTC instead of rendering to a window: connect NVI
 WebRTC Streaming Client to that machine (49100/tcp and 47998/udp). The stream has no
 authentication, so keep it on a trusted network. On the real arm everything runs on the local PC.
 
+### Training a policy
+
+[`lab/`](lab/README.md) trains a reach policy in Isaac Lab on the simulator's own arm and exports
+it to ONNX; `bringup.launch.py policy:=<file>` loads it into `piper_controllers`' policy
+controller, which takes over from the trajectory controller and moves the tool to target poses.
+
 ### Recording and plots
 
 ```bash
