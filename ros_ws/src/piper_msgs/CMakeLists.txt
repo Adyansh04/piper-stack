@@ -23,11 +23,7 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "msg/TreeStatus.msg"
   "srv/ComputeGrasps.srv"
   "srv/ControlTree.srv"
-  "srv/DeleteTree.srv"
-  "srv/GetTree.srv"
-  "srv/GetTreeModels.srv"
   "srv/PlaceTarget.srv"
-  "srv/SaveTree.srv"
   "srv/SegmentObjects.srv"
   DEPENDENCIES builtin_interfaces geometry_msgs sensor_msgs std_msgs
 )

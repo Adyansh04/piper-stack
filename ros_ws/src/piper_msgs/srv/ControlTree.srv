@@ -2,7 +2,7 @@
 
 # PAUSE: stop ticking; running skills finish their step, nothing new starts.
 uint8 PAUSE = 1
-# HOLD: stop ticking and halt the running skills (the arm and base stop).
+# HOLD: stop ticking and halt the running skills (the arm stops).
 uint8 HOLD = 2
 # RESUME: tick again; held skills start again from their beginning.
 uint8 RESUME = 3

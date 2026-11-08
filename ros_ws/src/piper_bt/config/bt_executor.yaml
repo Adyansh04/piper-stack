@@ -1,0 +1,26 @@
+/**/bt_executor:
+  ros__parameters:
+    # Directories whose *.xml trees are loaded, subdirectories too: a path, or
+    # package://<package>/<path> in a package's share directory.
+    tree_directories: ["package://piper_bt/trees"]
+    # Ticks per second of a running tree; the skills behind the leaves run on their own.
+    tick_rate_hz: 20.0
+    # ~/status (node statuses and blackboard for clients) goes out on a change at most this often,
+    # and once a second anyway, seconds.
+    status_period_s: 0.1
+    # Groot2 watches a running tree on this port (and the one after), 1 to 65534; 0 turns it off.
+    # A taken port only costs the monitoring: the run goes on without it.
+    groot2_port: 0
+    # Threads serving run_tree and the leaves' client callbacks (the tree ticks on its own).
+    executor_threads: 4
+    # The leaves' time limits where a tree sets none (a port of 0), seconds: waiting for a server;
+    # for a service's response; for an action's result, after which the goal is cancelled; the same
+    # for the goals that end in a minute or two (the arm to a named pose): a server restarted within server_lost_s has forgotten its goal and sends no result;
+    # for a server that left the graph mid-goal to come back (the graph shows a dead process once
+    # its DDS lease expires); for a halted goal to confirm its stop.
+    server_timeout_s: 10.0
+    response_timeout_s: 30.0
+    goal_timeout_s: 900.0
+    short_goal_timeout_s: 180.0
+    server_lost_s: 10.0
+    halt_wait_s: 10.0

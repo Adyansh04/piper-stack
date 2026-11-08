@@ -1,0 +1,13 @@
+<?xml version="1.0"?>
+<!-- Moves the arm to a named pose, e.g. back to ready after a mission that failed. -->
+<root BTCPP_format="4">
+  <BehaviorTree ID="ArmToPose">
+    <MoveArmToNamedPose name="arm_there" pose="{pose}"/>
+  </BehaviorTree>
+
+  <TreeNodesModel>
+    <SubTree ID="ArmToPose">
+      <input_port name="pose" default="ready">The SRDF state: ready, rest, view_left or view_right.</input_port>
+    </SubTree>
+  </TreeNodesModel>
+</root>

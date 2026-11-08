@@ -8,7 +8,7 @@ uint8 IDLE = 0
 uint8 RUNNING = 1
 # Pause: no tick; the skills already running go on to their end, nothing new starts.
 uint8 PAUSED = 2
-# Hold: no tick and the running skills halted (the arm and base stop); Resume starts them again.
+# Hold: no tick and the running skills halted (the arm stops); Resume starts them again.
 uint8 HELD = 3
 uint8 state
 

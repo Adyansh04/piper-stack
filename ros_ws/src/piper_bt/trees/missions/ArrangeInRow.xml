@@ -1,0 +1,33 @@
+<?xml version="1.0"?>
+<!--
+  Puts objects in a row across the table, left to right as the robot sees it:
+
+    objects=red cube;blue cube;green cube  spacing_m=0.08  row_y_m=0.0
+
+  The first object goes spacing_m left of the work area's centre and each next one spacing_m
+  further right (metric x), row_y_m metres away from the centre. The first object it cannot put
+  down ends the row.
+-->
+<root BTCPP_format="4">
+  <BehaviorTree ID="ArrangeInRow">
+    <Sequence name="arrange">
+      <!-- A run's keys are text, and text assigned to a number becomes a number. -->
+      <Script name="start_left" code="step := 0.0; step := spacing_m; slot_x := 0.0; slot_x -= step"/>
+      <LoopString name="each_object" queue="{objects}" value="{object}">
+        <Sequence name="next_in_row">
+          <SubTree ID="PickAndPlace" name="move_it" object="{object}" place_mode="metric"
+                   place_x="{slot_x}" place_y="{row_y_m}" place_tolerance_m="0.02"/>
+          <Script name="next_slot" code="slot_x += step"/>
+        </Sequence>
+      </LoopString>
+    </Sequence>
+  </BehaviorTree>
+
+  <TreeNodesModel>
+    <SubTree ID="ArrangeInRow">
+      <input_port name="objects">The objects, separated by semicolons.</input_port>
+      <input_port name="spacing_m" default="0.08">Between their centres, metres.</input_port>
+      <input_port name="row_y_m" default="0.0">The row's distance from the centre, away, metres.</input_port>
+    </SubTree>
+  </TreeNodesModel>
+</root>

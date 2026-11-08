@@ -1,0 +1,38 @@
+<?xml version="1.0"?>
+<!--
+  Moves every object matching a prompt to a region, until none is left in view:
+
+    object=cube  region=right
+
+  Ends with success when a look finds none, and with failure when a look fails for another reason
+  or an object cannot be picked or put down.
+-->
+<root BTCPP_format="4">
+  <BehaviorTree ID="ClearWorkspace">
+    <Sequence name="clear">
+      <Script name="not_done" code="cleared := false; nothing_left := false"/>
+      <ForceSuccess name="the_loop_ends_on_a_failure">
+        <KeepRunningUntilFailure name="until_none_left">
+          <Fallback name="move_one_or_finish">
+            <Sequence name="one_more">
+              <FindObjects name="look" prompt="{object}" nothing_in_view="{nothing_left}"/>
+              <SubTree ID="PickAndPlace" name="move_it" object="{object}" place_region="{region}"/>
+            </Sequence>
+            <Sequence name="finish_when_none">
+              <Script name="none_left" _skipIf="nothing_left != true" code="cleared := true"/>
+              <AlwaysFailure name="stop"/>
+            </Sequence>
+          </Fallback>
+        </KeepRunningUntilFailure>
+      </ForceSuccess>
+      <ScriptCondition name="none_left_at_the_end" code="cleared == true"/>
+    </Sequence>
+  </BehaviorTree>
+
+  <TreeNodesModel>
+    <SubTree ID="ClearWorkspace">
+      <input_port name="object">What to clear, as SAM 3.1 reads it.</input_port>
+      <input_port name="region" default="right">Where it all goes.</input_port>
+    </SubTree>
+  </TreeNodesModel>
+</root>
