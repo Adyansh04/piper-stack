@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import hashlib
 import logging
+import re
 import shutil
 import xml.etree.ElementTree as ET
 from pathlib import Path
@@ -103,7 +104,7 @@ def _mesh_digest(xml: str, packages: dict[str, str]) -> str:
     return digest.hexdigest()
 
 
-def _prune(cache: Path, keep: int) -> None:
+def prune_cache(cache: Path, keep: int) -> None:
     """Delete all but the newest ``keep`` finished conversions in the cache."""
     finished = sorted(
         (d for d in cache.iterdir() if (d / 'done').is_file()),
@@ -111,8 +112,55 @@ def _prune(cache: Path, keep: int) -> None:
         reverse=True,
     )
     for old in finished[keep:]:
-        log.info('Removing the old robot conversion %s', old)
+        log.info('Removing the old conversion %s', old)
         shutil.rmtree(old, ignore_errors=True)
+
+
+def drive_gain(values: float | dict[str, float], joint: str) -> float:
+    """Return a drive gain for a joint: one number, or the value of the first regex it matches.
+
+    Raises:
+        KeyError: If no regex matches the joint.
+    """
+    if not isinstance(values, dict):
+        return float(values)
+    for pattern, value in values.items():
+        if re.fullmatch(pattern, joint):
+            return float(value)
+    raise KeyError(f'No drive gain matches joint {joint!r}')
+
+
+def set_mujoco_gains(stage, root: str, drives: dict) -> int:
+    """Give the robot's MuJoCo actuators sim.yaml's drive gains, per radian and per metre.
+
+    Isaac Sim 6.2's URDF importer copies the PhysX drives' gains, which are per degree on revolute
+    joints, into the MuJoCo variant's position actuators as they are: 57 times too soft under
+    Newton. A MuJoCo position actuator's force is gain * target - gain * q - damping * qdot.
+
+    Args:
+        stage: The stage, the robot's ``mujoco`` physics variant selected.
+        root: The robot's prim.
+        drives: sim.yaml's robot drives (stiffness and damping per joint regex).
+
+    Returns:
+        The number of actuators set.
+    """
+    from pxr import Usd, Vt
+
+    count = 0
+    for prim in Usd.PrimRange(stage.GetPrimAtPath(root)):
+        if prim.GetTypeName() != 'MjcActuator':
+            continue
+        joint = prim.GetRelationship('mjc:target').GetTargets()[0].name
+        stiffness = drive_gain(drives['stiffness'], joint)
+        damping = drive_gain(drives['damping'], joint)
+        gain = list(prim.GetAttribute('mjc:gainPrm').Get())
+        bias = list(prim.GetAttribute('mjc:biasPrm').Get())
+        gain[0], bias[1], bias[2] = stiffness, -stiffness, -damping
+        prim.GetAttribute('mjc:gainPrm').Set(Vt.DoubleArray(gain))
+        prim.GetAttribute('mjc:biasPrm').Set(Vt.DoubleArray(bias))
+        count += 1
+    return count
 
 
 def import_robot(
@@ -181,5 +229,5 @@ def import_robot(
     ).import_urdf()
     # Written last: a start cut off mid-import redoes it.
     done.write_text(key)
-    _prune(cache, KEEP_CONVERSIONS)
+    prune_cache(cache, KEEP_CONVERSIONS)
     return str(usd), xml

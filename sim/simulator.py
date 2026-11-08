@@ -24,6 +24,8 @@ import omni.usd
 import rclpy
 import robot
 import sensors
+import task as task_spec
+import task_usd
 import world
 from isaacsim.core.simulation_manager import SimulationEvent, SimulationManager
 from omni.kit.loop import _loop
@@ -81,14 +83,22 @@ class Arm:
         node: The simulator's node.
         articulation_root: Prim path of the robot's articulation root.
         urdf: The robot's URDF text, for its mimic tags.
+        engine: The physics engine (physx or newton), whose tensor backend the views use.
         shadow: sim.yaml's ``shadow`` section in shadow mode; None when the stack drives the arm.
     """
 
     def __init__(
-        self, node: Node, *, articulation_root: str, urdf: str, shadow: dict | None = None
+        self,
+        node: Node,
+        *,
+        articulation_root: str,
+        urdf: str,
+        engine: str,
+        shadow: dict | None = None,
     ) -> None:
         self.log = node.get_logger()
         self.articulation_root = articulation_root
+        self.engine = engine
         self.urdf = urdf
         self.shadow = shadow is not None
         state_topic = shadow['state_topic'] if shadow else 'isaac_joint_states'
@@ -126,8 +136,11 @@ class Arm:
             return
         import omni.physics.tensors as tensors
 
+        # PhysX runs the arm on the CPU (NumPy views), Newton on the GPU (Warp views).
         self.sim_view = tensors.create_simulation_view(
-            'numpy', stage_id=omni.usd.get_context().get_stage_id()
+            'numpy' if self.engine == 'physx' else 'warp',
+            stage_id=omni.usd.get_context().get_stage_id(),
+            backend=self.engine,
         )
         self.sim_view.set_subspace_roots('/')
         view = self.sim_view.create_articulation_view(self.articulation_root)
@@ -139,7 +152,10 @@ class Arm:
             if mimic is not None and mimic[0] in self.index:
                 self.mimics.append((self.index[name], self.index[mimic[0]], mimic[1], mimic[2]))
         self.free = [i for i in range(len(self.names)) if i not in {m[0] for m in self.mimics}]
-        self.articulations = np.array([0], dtype=np.int32)
+        self.device = None
+        if self.engine != 'physx':
+            self.device = view.get_dof_positions().device
+        self.articulations = self.to_view(np.array([0], dtype=np.int32))
         self.history.clear()
         self.view = view
         self.log.info(f'Arm articulation view ready: joints {self.names}')
@@ -157,11 +173,20 @@ class Arm:
                 self.log.warning(f'Arm step failed, rebuilding the views: {traceback.format_exc()}')
             self.view = None
 
+    def to_view(self, values: np.ndarray):
+        """Return a NumPy array as the views take it: itself, or a Warp array on their device."""
+        if self.device is None:
+            return values
+        import warp as wp
+
+        dtype = wp.float32 if values.dtype.kind == 'f' else wp.int32
+        return wp.array(values, dtype=dtype, device=self.device)
+
     def _control(self, t_s: float) -> None:
         with self.lock:
             command = dict(self.command)
-        positions = self.view.get_dof_positions()
-        targets = self.view.get_dof_position_targets()
+        positions = world.host_array(self.view.get_dof_positions())
+        targets = world.host_array(self.view.get_dof_position_targets()).copy()
         for name, value in command.items():
             if name in self.index:
                 targets[0, self.index[name]] = value
@@ -169,23 +194,50 @@ class Arm:
             targets[0, follower] = multiplier * targets[0, leader] + offset
         if self.shadow and command:
             # The twin shows where the other arm is: set there at rest, the drives holding it.
-            self.view.set_dof_positions(targets, self.articulations)
-            self.view.set_dof_velocities(np.zeros_like(targets), self.articulations)
+            self.view.set_dof_positions(self.to_view(targets), self.articulations)
+            self.view.set_dof_velocities(self.to_view(np.zeros_like(targets)), self.articulations)
             positions = targets
-        self.view.set_dof_position_targets(targets, self.articulations)
+        self.view.set_dof_position_targets(self.to_view(targets), self.articulations)
         q = positions[0].astype(float)
         # PhysX's velocities stay off zero on a joint its drive holds against a load: the change
         # in position over the window is the motion.
         self.history.append((t_s, q))
         t0, q0 = self.history[0]
         qd = np.zeros_like(q) if t_s <= t0 else (q - q0) / (t_s - t0)
-        effort = self.view.get_dof_projected_joint_forces()[0].astype(float)
+        effort = world.host_array(self.view.get_dof_projected_joint_forces())[0].astype(float)
         msg = JointState(name=[self.names[i] for i in self.free])
         msg.header.stamp = Time(seconds=t_s).to_msg()
         msg.position = q[self.free].tolist()
         msg.velocity = qd[self.free].tolist()
         msg.effort = effort[self.free].tolist()
         self.pub.publish(msg)
+
+
+def configure_newton(cfg: dict, physics_hz: float) -> None:
+    """Set Newton up for the next play: MuJoCo-Warp with Newton's own (signed distance) contacts.
+
+    Args:
+        cfg: sim.yaml's ``newton`` section.
+        physics_hz: Physics steps a second; each runs ``substeps`` solver steps.
+    """
+    from isaacsim.physics.newton import (
+        MuJoCoSolverConfig,
+        NewtonConfig,
+        NewtonSolverOutputConfig,
+    )
+    from isaacsim.physics.newton import configure_newton as configure
+
+    configure(
+        NewtonConfig(
+            num_substeps=int(cfg['substeps']),
+            physics_frequency=float(physics_hz),
+            solver_cfg=MuJoCoSolverConfig(
+                cone=cfg['cone'], njmax=int(cfg['njmax']), nconmax=int(cfg['nconmax'])
+            ),
+            # The joint loop publishes every joint's effort: the contact tasks' torque estimate.
+            solver_outputs=NewtonSolverOutputConfig(link_incoming_joint_force=True),
+        )
+    )
 
 
 def find_body(stage, under: str, name: str) -> str:
@@ -274,9 +326,18 @@ def run(app, cfg: dict, stop: threading.Event) -> None:
     try:
         stage = omni.usd.get_context().get_stage()
         shadow = cfg['shadow'] if cfg['app']['mode'] == 'shadow' else None
-        # A twin's cubes would stand where nothing is on the real table.
-        cubes = world.build(stage, {**cfg['world'], 'cubes': []} if shadow else cfg['world'])
         r = cfg['robot']
+        task = cfg['world']['task']
+        # A twin's cubes would stand where nothing is on the real table; a task replaces them.
+        objects = world.build(
+            stage, {**cfg['world'], 'cubes': []} if shadow or task else cfg['world']
+        )
+        if task and not shadow:
+            spec = task_spec.load(Path(cfg['world']['tasks_dir']) / task)
+            files = task_usd.build(spec, Path(r['usd_cache']).parent / 'tasks')
+            bodies = task_usd.body_paths(spec, task_usd.add(stage, spec, files))
+            objects += list(bodies.items())
+            log.info(f'Task {task}: {len(spec.parts)} parts, {len(bodies)} moving')
         usd, urdf = robot.import_robot(
             Path(r['urdf']), Path(r['usd_cache']), r['packages'], r['drives']
         )
@@ -284,10 +345,15 @@ def run(app, cfg: dict, stop: threading.Event) -> None:
         prim.GetReferences().AddReference(usd)
         # The importer's USD leaves its physics variant unselected: no bodies, no joints.
         prim.GetVariantSet('Physics').SetVariantSelection(PHYSICS_VARIANTS[cfg['app']['engine']])
+        if cfg['app']['engine'] == 'newton':
+            count = robot.set_mujoco_gains(stage, '/World/piper', r['drives'])
+            log.info(f'MuJoCo actuators given the drives of sim.yaml: {count}')
         app.update()
         root = find_articulation_root(stage, '/World/piper')
-        arm = Arm(node, articulation_root=root, urdf=urdf, shadow=shadow)
-        truth = world.GroundTruth(node, cubes, float(cfg['world']['ground_truth_period_s']))
+        arm = Arm(
+            node, articulation_root=root, urdf=urdf, engine=cfg['app']['engine'], shadow=shadow
+        )
+        truth = world.GroundTruth(node, objects, float(cfg['world']['ground_truth_period_s']))
         camera = cfg['camera']
         if shadow:
             camera = {**camera, 'namespace': shadow['camera_namespace']}
@@ -316,6 +382,7 @@ def run(app, cfg: dict, stop: threading.Event) -> None:
         engine = cfg['app']['engine']
         # Newton registers itself but stays inactive without its auto-switch (off: sim.py).
         if engine == 'newton':
+            configure_newton(cfg['newton'], physics_hz)
             SimulationManager.switch_physics_engine('newton')
         device = cfg['app']['device'][engine]
         SimulationManager.setup_simulation(dt=1.0 / physics_hz, device=device)

@@ -22,6 +22,11 @@ log = logging.getLogger('sim.world')
 QOS_GROUND_TRUTH = QoSProfile(depth=10, reliability=ReliabilityPolicy.RELIABLE)
 
 
+def host_array(values) -> np.ndarray:
+    """Return a physics tensor as a NumPy array: PhysX's CPU views give NumPy, Newton's Warp."""
+    return values.numpy() if hasattr(values, 'numpy') else np.asarray(values)
+
+
 def _box(
     stage: Usd.Stage, path: str, size_m: list[float], centre_m: list[float], colour: list[float]
 ) -> Usd.Prim:
@@ -90,17 +95,17 @@ def build(stage: Usd.Stage, cfg: dict) -> list[tuple[str, str]]:
 
 
 class GroundTruth:
-    """Publishes the cubes' poses in ``world`` on ``sim/objects``, every ``period_s``.
+    """Publishes the objects' poses (cubes, a task's parts) in ``world`` on ``sim/objects``.
 
     Args:
         node: The simulator's node.
-        cubes: Each cube's name and prim path.
+        objects: Each object's name and the prim path of its rigid body.
         period_s: Simulation time between two messages.
     """
 
-    def __init__(self, node: Node, cubes: list[tuple[str, str]], period_s: float) -> None:
-        self.names = [name for name, _ in cubes]
-        self.paths = [path for _, path in cubes]
+    def __init__(self, node: Node, objects: list[tuple[str, str]], period_s: float) -> None:
+        self.names = [name for name, _ in objects]
+        self.paths = [path for _, path in objects]
         self.period_s = period_s
         self.next_s = 0.0
         self.last_s = 0.0
@@ -119,7 +124,7 @@ class GroundTruth:
         if self.sim_view is not sim_view:
             self.view, self.sim_view = sim_view.create_rigid_body_view(self.paths), sim_view
         self.next_s = t_s + self.period_s
-        poses = np.asarray(self.view.get_transforms(), dtype=float)
+        poses = host_array(self.view.get_transforms()).astype(float)
         stamp = Time(seconds=t_s).to_msg()
         msg = TFMessage()
         for name, pose in zip(self.names, poses, strict=True):

@@ -45,3 +45,12 @@ def test_the_physics_rate_is_a_multiple_of_the_render_rate() -> None:
     app = yaml.safe_load(CONFIG.read_text())['app']
     assert app['physics_hz'] % app['render_hz'] == 0
     assert set(app['device']) == {'physx', 'newton'}
+
+
+def test_a_drive_gain_is_the_first_regex_that_matches_the_joint() -> None:
+    gains = {'joint[1-6]': 4000.0, 'joint[78]': 2000.0}
+    assert robot.drive_gain(gains, 'joint2') == 4000.0
+    assert robot.drive_gain(gains, 'joint8') == 2000.0
+    assert robot.drive_gain(50.0, 'joint8') == 50.0
+    with pytest.raises(KeyError):
+        robot.drive_gain(gains, 'joint9')

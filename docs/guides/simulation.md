@@ -1,7 +1,8 @@
 # Simulation
 
-The stack against the Piper in Isaac Sim 6.2: the arm on a table with four 5 cm cubes, the wrist
-camera rendered with the real camera's resolution and focal length, PhysX at 200 Hz.
+The stack against the Piper in Isaac Sim 6.2: the arm on a table with four 5 cm cubes or a task's
+parts, the wrist camera rendered with the real camera's resolution and focal length, PhysX or
+Newton at 200 Hz.
 
 ## Once
 
@@ -38,14 +39,19 @@ Environment variables before the command:
 - `LIVESTREAM=true`: Isaac Sim's UI over WebRTC instead, for a simulator on a GPU server: connect
   NVIDIA's Isaac Sim WebRTC Streaming Client to it (49100/tcp, 47998/udp). No authentication: keep
   it on a trusted network.
-- `PHYSICS_ENGINE=newton`: Newton instead of PhysX (not working with the joint loop yet).
+- `PHYSICS_ENGINE=newton`: Newton (MuJoCo-Warp with Newton's own signed-distance contacts, 3
+  solver steps per physics step) instead of PhysX. The contact tasks need it: their threads and the
+  USB-C fit collide through each mesh's signed distance field.
+- `TASK=assembly` (or another folder under `tasks/`): that task's parts on the table at their start
+  poses instead of the cubes ([tasks/README.md](../../tasks/README.md)).
 
-`sim/config/sim.yaml` holds the rates, the world (table, cubes and their friction), the camera and
-the joint drives, with a comment on each value.
+`sim/config/sim.yaml` holds the rates, the world (table, cubes and their friction, the task), the
+cameras, Newton's solver settings and the joint drives, with a comment on each value.
 
 ## What it publishes
 
 - `/clock`, and `/isaac_joint_states` for `ros2_control` (it takes `/isaac_joint_commands`).
 - `/wrist_camera/color/image_raw`, `/wrist_camera/depth/image_raw` (32FC1 metres, aligned to colour)
   and their `camera_info`, as Percipio's driver names them.
-- `/sim/objects`: the cubes' poses in `world` (TFMessage), the ground truth for tests.
+- `/sim/objects`: the cubes' or the task parts' poses in `world` (TFMessage), the ground truth for
+  tests and for scripted experts.

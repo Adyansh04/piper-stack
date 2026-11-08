@@ -4,9 +4,9 @@ Run inside the sim image (``scripts/run/sim.sh`` does):
 
     /isaac-sim/python.sh /piper-stack/sim/sim.py --config /piper-stack/sim/config/sim.yaml
 
-HEADLESS and LIVESTREAM (true or false), PHYSICS_ENGINE (physx or newton) and SIM_MODE (control
-or shadow) override app.headless, app.livestream.enabled, app.engine and app.mode. Python because
-Isaac Sim's scripting API is Python.
+HEADLESS and LIVESTREAM (true or false), PHYSICS_ENGINE (physx or newton), SIM_MODE (control or
+shadow) and TASK (a task under tasks/) override app.headless, app.livestream.enabled, app.engine,
+app.mode and world.task. Python because Isaac Sim's scripting API is Python.
 """
 
 from __future__ import annotations
@@ -22,12 +22,14 @@ import yaml
 
 # Enabled before the simulator is imported: rclpy comes with the ROS 2 bridge.
 EXTENSIONS = ('isaacsim.ros2.core', 'isaacsim.ros2.bridge')
+# Newton and its backend for the physics tensors the joint loop reads the arm through.
+NEWTON_EXTENSIONS = ('isaacsim.physics.newton', 'isaacsim.physics.newton.tensors')
 ENGINES = ('physx', 'newton')
 MODES = ('control', 'shadow')
 
 
 def load_config(path: str) -> dict:
-    """Return sim.yaml with the HEADLESS, LIVESTREAM, PHYSICS_ENGINE and SIM_MODE overrides applied.
+    """Return sim.yaml with the HEADLESS, LIVESTREAM, PHYSICS_ENGINE, SIM_MODE and TASK overrides.
 
     Raises:
         ValueError: If the engine is neither physx nor newton, the mode neither control nor shadow,
@@ -43,6 +45,8 @@ def load_config(path: str) -> dict:
         cfg['app']['livestream']['enabled'] = os.getenv('LIVESTREAM') == 'true'
     if os.getenv('SIM_MODE'):
         cfg['app']['mode'] = os.getenv('SIM_MODE')
+    if os.getenv('TASK'):
+        cfg['world']['task'] = os.getenv('TASK')
     if cfg['app']['engine'] not in ENGINES:
         raise ValueError(f'app.engine {cfg["app"]["engine"]!r} is not one of {ENGINES}')
     if cfg['app']['mode'] not in MODES:
@@ -113,7 +117,8 @@ def main() -> None:
         for ext in EXTENSIONS:
             app_utils.enable_extension(ext)
         if engine == 'newton':
-            app_utils.enable_extension('isaacsim.physics.newton')
+            for ext in NEWTON_EXTENSIONS:
+                app_utils.enable_extension(ext)
         app.update()
         import simulator
 

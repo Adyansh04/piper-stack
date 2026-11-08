@@ -51,6 +51,28 @@ def place(stage: Usd.Stage, path: str, T: np.ndarray, type_name: str = 'Xform') 
     return prim
 
 
+def define_camera(stage: Usd.Stage, path: str, T_optical: np.ndarray, cfg: dict) -> None:
+    """Define a pinhole camera: centred principal point, no distortion.
+
+    Args:
+        stage: The stage.
+        path: The camera's prim path.
+        T_optical: Its optical frame in the prim's parent (z forward, x right, y down).
+        cfg: ``width_px``, ``height_px``, the focal length ``fx_px`` and the render range
+            ``near_m`` to ``far_m``.
+    """
+    width_px, height_px = int(cfg['width_px']), int(cfg['height_px'])
+    # USD cameras look along -z with y up: half a turn about x from the optical frame.
+    flip = np.diag([1.0, -1.0, -1.0, 1.0])
+    camera = UsdGeom.Camera(place(stage, path, T_optical @ flip, 'Camera'))
+    aperture_mm = 20.955
+    camera.CreateHorizontalApertureAttr(aperture_mm)
+    camera.CreateVerticalApertureAttr(aperture_mm * height_px / width_px)
+    camera.CreateFocalLengthAttr(aperture_mm * float(cfg['fx_px']) / width_px)
+    camera.CreateClippingRangeAttr(Gf.Vec2f(float(cfg['near_m']), float(cfg['far_m'])))
+    camera.CreateProjectionAttr('perspective')
+
+
 def add_camera(
     stage: Usd.Stage, path: str, T_optical: np.ndarray, cfg: dict, render_hz: float
 ) -> None:
@@ -66,16 +88,8 @@ def add_camera(
         cfg: sim.yaml's ``camera`` section.
         render_hz: Frames rendered a second.
     """
+    define_camera(stage, path, T_optical, cfg)
     width_px, height_px = int(cfg['width_px']), int(cfg['height_px'])
-    # USD cameras look along -z with y up: half a turn about x from the optical frame.
-    flip = np.diag([1.0, -1.0, -1.0, 1.0])
-    camera = UsdGeom.Camera(place(stage, path, T_optical @ flip, 'Camera'))
-    aperture_mm = 20.955
-    camera.CreateHorizontalApertureAttr(aperture_mm)
-    camera.CreateVerticalApertureAttr(aperture_mm * height_px / width_px)
-    camera.CreateFocalLengthAttr(aperture_mm * float(cfg['fx_px']) / width_px)
-    camera.CreateClippingRangeAttr(Gf.Vec2f(float(cfg['near_m']), float(cfg['far_m'])))
-    camera.CreateProjectionAttr('perspective')
     skip = frame_skip(render_hz, float(cfg['rate_hz']))
     helpers = {
         'Rgb': ('color/image_raw', 'rgb', cfg['color_frame_id']),

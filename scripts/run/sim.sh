@@ -15,9 +15,10 @@
 #
 # The simulator runs headless in the sim container (docker compose --profile sim); its first start
 # compiles shaders for minutes. HEADLESS=false opens Isaac Sim's window, PHYSICS_ENGINE=newton
-# tries Newton, LIVESTREAM=true streams Isaac Sim's UI over WebRTC (for a simulator on another
-# machine: NVIDIA's Isaac Sim WebRTC Streaming Client, 49100/tcp and 47998/udp). name:=value
-# arguments go to the bringup launch. --print lists the commands.
+# runs Newton (the contact tasks' threads and connector need it), TASK=<name> puts a task's parts
+# (tasks/<name>) on the table instead of the cubes, LIVESTREAM=true streams Isaac Sim's UI over
+# WebRTC (for a simulator on another machine: NVIDIA's Isaac Sim WebRTC Streaming Client, 49100/tcp
+# and 47998/udp). name:=value arguments go to the bringup launch. --print lists the commands.
 # shellcheck source=../lib/panes.sh
 source "$(dirname "$0")/../lib/panes.sh"
 parse_args "$@"
@@ -28,7 +29,7 @@ readonly BRINGUP="ros2 launch piper_bringup bringup.launch.py hardware:=isaac"
 readonly JOG='ros2 run piper_teleop keyboard_jog --ros-args --params-file "$(ros2 pkg prefix piper_teleop)/share/piper_teleop/config/keyboard_jog.yaml" -p use_sim_time:=true'
 # The robot description the simulator imports, written by the dev container (it has xacro).
 readonly URDF='mkdir -p /piper-stack/data/sim && xacro /piper-stack/ros_ws/src/piper_description/urdf/piper.urdf.xacro > /piper-stack/data/sim/piper.urdf'
-readonly SIM="./scripts/manage.sh exec bash -c '${URDF}' && HOST_UID=\$(id -u) HOST_GID=\$(id -g) docker compose --profile sim up -d sim && docker exec -it -e HEADLESS=\${HEADLESS:-true} -e PHYSICS_ENGINE=\${PHYSICS_ENGINE:-physx} -e SIM_MODE=\${SIM_MODE:-control} -e LIVESTREAM=\${LIVESTREAM:-false} piper-sim /isaac-sim/python.sh /piper-stack/sim/sim.py"
+readonly SIM="./scripts/manage.sh exec bash -c '${URDF}' && HOST_UID=\$(id -u) HOST_GID=\$(id -g) docker compose --profile sim up -d sim && docker exec -it -e HEADLESS=\${HEADLESS:-true} -e PHYSICS_ENGINE=\${PHYSICS_ENGINE:-physx} -e SIM_MODE=\${SIM_MODE:-control} -e TASK=\${TASK:-} -e LIVESTREAM=\${LIVESTREAM:-false} piper-sim /isaac-sim/python.sh /piper-stack/sim/sim.py"
 readonly WAIT_CLOCK="wait_for /clock 'timeout 10 ros2 topic echo --once /clock'"
 readonly SEGMENT="ros2 launch piper_perception sam3_segmentation.launch.py use_sim_time:=true"
 readonly GRASPS="ros2 launch piper_perception grasp_generation.launch.py"

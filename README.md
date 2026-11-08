@@ -26,8 +26,9 @@ cp .env.example .env
 ```
 
 This starts Isaac Sim headless in the sim container (`docker/sim/Dockerfile`, built on first use
-with `docker compose --profile sim build sim`) with the arm on a table, four 5 cm cubes and the
-wrist camera, then the stack on `hardware:=isaac`, on the simulator's clock. The first start
+with `docker compose --profile sim build sim`) with the arm on a table, four 5 cm cubes (or a
+task's parts: [tasks/](tasks/README.md)) and the wrist camera, then the stack on
+`hardware:=isaac`, on the simulator's clock. The first start
 compiles shaders for a few minutes. `sim/config/sim.yaml` sets the physics and render rates, the
 world and the camera.
 

@@ -36,6 +36,10 @@ app:
   run_s: null
 
 world:
+  # A task's parts on the table instead of the cubes, from tasks_dir/<task>/task.yaml at their
+  # start poses; null: the cubes. TASK overrides it.
+  task: null
+  tasks_dir: /piper-stack/tasks
   light_intensity: 1000.0
   floor_colour: [0.35, 0.35, 0.37]
   # The arm stands at the table's edge: the robot's base at the world origin on the top (z 0).
@@ -77,6 +81,31 @@ camera:
   far_m: 5.0
   # Frames a second; the nearest of render_hz / n is used.
   rate_hz: 25.0
+
+# Newton (app.engine newton): MuJoCo-Warp with Newton's own collision pipeline, so meshes collide
+# through their signed distance fields (the task parts' threads, the USB-C connector).
+newton:
+  # Solver steps per physics step: 3 at 200 Hz is 600 Hz, what thread contacts were checked at.
+  substeps: 3
+  # Elliptic friction cones slip less in a grasp than pyramidal ones.
+  cone: elliptic
+  # Constraint rows and contacts the solver holds per world.
+  njmax: 2000
+  nconmax: 1000
+
+# The overhead RGB camera: a standard USB camera on a stand above the work area, looking straight
+# down with the image's top away from the arm. Its optical frame (z forward, x right, y down) in
+# the world frame: xyz in metres, rpy in degrees (fixed axes, as in URDF).
+overhead_camera:
+  xyz_m: [0.3, 0.0, 1.0]
+  rpy_deg: [180.0, 0.0, -90.0]
+  width_px: 1280
+  height_px: 720
+  # A 70 degree horizontal field of view.
+  fx_px: 914.0
+  near_m: 0.1
+  far_m: 5.0
+  rate_hz: 30.0
 
 shadow:
   # The joint states the twin follows, and where it publishes its own to compare with them.
