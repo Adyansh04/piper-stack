@@ -1,8 +1,21 @@
 #include "piper_driver/fake_arm.hpp"
 
 #include <algorithm>
-#include <cmath>
+#include <array>
+#include <chrono>
+#include <cstddef>
+#include <cstdint>
+#include <expected>
+#include <memory>
+#include <mutex>
+#include <stop_token>
+#include <system_error>
+#include <thread>
+#include <tuple>
 #include <utility>
+
+#include "piper_driver/can_bus.hpp"
+#include "piper_driver/protocol.hpp"
 
 namespace piper_driver
 {
@@ -111,7 +124,7 @@ void FakeArm::apply(const Frame & f)
                 {
                     Frame reply{.id = id::kFirmware, .length = 8, .data = {}};
                     std::copy_n(chunk, 8, reply.data.begin());
-                    (void)bus_.send(reply);
+                    std::ignore = bus_.send(reply);
                 }
             }
             return;
@@ -159,23 +172,26 @@ void FakeArm::sendFeedback(std::uint64_t cycle)
             0,
             0};
     }
-    (void)bus_.send(status);
+    std::ignore = bus_.send(status);
     for (std::uint32_t i = 0; i < 3; ++i)
     {
-        (void)bus_.send(
-            pairFrame(id::kJoint12 + i, q[2 * i], q[2 * i + 1], protocol::kMilliDegPerRad));
+        std::ignore = bus_.send(pairFrame(
+            id::kJoint12 + i,
+            q[2 * std::size_t{i}],
+            q[(2 * std::size_t{i}) + 1],
+            protocol::kMilliDegPerRad));
     }
     Frame gripper{.id = id::kGripper, .length = 8, .data = {}};
     protocol::detail::putI32(
         gripper.data, 0, protocol::detail::toI32(stroke_m / protocol::kMetrePerMicrometre));
-    (void)bus_.send(gripper);
+    std::ignore = bus_.send(gripper);
     // Driver frames at a fifth of the rate, like the arm's 40 Hz.
     if (cycle % 5 == 0)
     {
         const bool on = enabled();
         for (std::uint32_t j = 0; j < protocol::kJointCount; ++j)
         {
-            Frame driver{
+            const Frame driver{
                 .id = id::kLowSpeed1 + j,
                 .length = 8,
                 .data = {
@@ -187,7 +203,7 @@ void FakeArm::sendFeedback(std::uint64_t cycle)
                     static_cast<std::uint8_t>(on ? protocol::kDriverEnabledBit : 0x00),
                     0,
                     0}};
-            (void)bus_.send(driver);
+            std::ignore = bus_.send(driver);
         }
     }
 }

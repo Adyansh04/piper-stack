@@ -3,11 +3,20 @@
 #include <algorithm>
 #include <chrono>
 #include <cmath>
+#include <cstddef>
+#include <cstdint>
+#include <exception>
+#include <format>
 #include <limits>
 #include <string>
+#include <string_view>
 #include <thread>
+#include <tuple>
+#include <utility>
 
 #include "hardware_interface/types/hardware_interface_type_values.hpp"
+#include "piper_driver/arm.hpp"
+#include "piper_driver/protocol.hpp"
 #include "pluginlib/class_list_macros.hpp"
 #include "rclcpp/logging.hpp"
 
@@ -32,6 +41,17 @@ std::int64_t steadyNs()
     return std::chrono::duration_cast<std::chrono::nanoseconds>(
                std::chrono::steady_clock::now().time_since_epoch())
         .count();
+}
+
+// hardware_interface declares the interface types as char arrays; views of them compare and
+// format without decaying.
+constexpr std::string_view kPosition{std::data(hardware_interface::HW_IF_POSITION)};
+constexpr std::string_view kVelocity{std::data(hardware_interface::HW_IF_VELOCITY)};
+constexpr std::string_view kEffort{std::data(hardware_interface::HW_IF_EFFORT)};
+
+std::string interfaceName(const std::string & joint, std::string_view type)
+{
+    return std::format("{}/{}", joint, type);
 }
 
 bool isTrue(const std::string & value)
@@ -74,8 +94,7 @@ CallbackReturn PiperSystem::on_init(
     for (std::size_t i = 0; i < joints_.size(); ++i)
     {
         const auto & joint = info_.joints[i];
-        if (joint.command_interfaces.size() != 1
-            || joint.command_interfaces[0].name != hardware_interface::HW_IF_POSITION)
+        if (joint.command_interfaces.size() != 1 || joint.command_interfaces[0].name != kPosition)
         {
             RCLCPP_FATAL(
                 get_logger(), "%s: one position command interface expected", joint.name.c_str());
@@ -146,14 +165,10 @@ CallbackReturn PiperSystem::on_configure(const rclcpp_lifecycle::State & /*previ
     for (std::size_t i = 0; i < joints_.size(); ++i)
     {
         const std::string & name = info_.joints[i].name;
-        joints_[i].position =
-            get_state_interface_handle(name + "/" + hardware_interface::HW_IF_POSITION);
-        joints_[i].velocity =
-            get_state_interface_handle(name + "/" + hardware_interface::HW_IF_VELOCITY);
-        joints_[i].effort =
-            get_state_interface_handle(name + "/" + hardware_interface::HW_IF_EFFORT);
-        joints_[i].command =
-            get_command_interface_handle(name + "/" + hardware_interface::HW_IF_POSITION);
+        joints_[i].position = get_state_interface_handle(interfaceName(name, kPosition));
+        joints_[i].velocity = get_state_interface_handle(interfaceName(name, kVelocity));
+        joints_[i].effort = get_state_interface_handle(interfaceName(name, kEffort));
+        joints_[i].command = get_command_interface_handle(interfaceName(name, kPosition));
     }
     const auto & state = arm_->latest();
     seen_foreign_ = state.foreign_commands;
@@ -170,7 +185,7 @@ CallbackReturn PiperSystem::on_configure(const rclcpp_lifecycle::State & /*previ
 CallbackReturn PiperSystem::on_activate(const rclcpp_lifecycle::State & /*previous_state*/)
 {
     const auto & state = arm_->latest();
-    std::copy(state.position_rad.begin(), state.position_rad.end(), target_rad_.begin());
+    std::ranges::copy(state.position_rad, target_rad_.begin());
     gripper_target_m_ = state.gripper.stroke_m / 2.0;
     // Controllers start from the measured pose, and the limits stretch to include it: the arm rests
     // slightly outside its firmware limits, and enabling must not move it.
@@ -372,7 +387,7 @@ bool PiperSystem::waitForFeedback(std::uint64_t frames, double timeout_s)
 void PiperSystem::holdMeasuredPose()
 {
     const auto & s = arm_->latest();
-    std::copy(s.position_rad.begin(), s.position_rad.end(), target_rad_.begin());
+    std::ranges::copy(s.position_rad, target_rad_.begin());
     std::ignore = arm_->commandJoints(target_rad_);
 }
 

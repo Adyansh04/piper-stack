@@ -204,7 +204,7 @@ inline bool decodeJoints(const Frame & frame, std::span<double, kJointCount> pos
     {
         return false;
     }
-    const std::size_t first = 2 * (frame.id - id::kJoint12);
+    const auto first = 2 * std::size_t{frame.id - id::kJoint12};
     position_rad[first] = detail::beI32(frame.data, 0) * kRadPerMilliDeg;
     position_rad[first + 1] = detail::beI32(frame.data, 4) * kRadPerMilliDeg;
     return true;
@@ -353,7 +353,7 @@ inline bool decodeJointTargets(
     {
         return false;
     }
-    const std::size_t first = 2 * (frame.id - id::kJointCtrl12);
+    const auto first = 2 * std::size_t{frame.id - id::kJointCtrl12};
     position_rad[first] = detail::beI32(frame.data, 0) * kRadPerMilliDeg;
     position_rad[first + 1] = detail::beI32(frame.data, 4) * kRadPerMilliDeg;
     return true;

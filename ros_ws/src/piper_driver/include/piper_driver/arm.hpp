@@ -44,7 +44,8 @@ struct ArmState
  * @warning latest() and the command functions may each be called from one thread only (the
  *          control loop). enable(false) removes motor torque: a raised arm falls.
  */
-class Arm
+// One per process, so its padding costs nothing; receiver_ must stay the last member.
+class Arm  // NOLINT(clang-analyzer-optin.performance.Padding)
 {
 public:
     /**

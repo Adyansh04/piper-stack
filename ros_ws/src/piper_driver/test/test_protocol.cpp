@@ -4,7 +4,9 @@
 #include <gtest/gtest.h>
 
 #include <array>
-#include <cmath>
+#include <cstddef>
+#include <cstdint>
+#include <ios>
 #include <numbers>
 
 #include "piper_driver/protocol.hpp"
@@ -50,7 +52,8 @@ TEST(Protocol, DecodesCapturedGripperAndDriver)
     const auto gripper =
         protocol::decodeGripper(frame(0x2A8, {0x00, 0x00, 0x03, 0x48, 0, 0, 0, 0}));
     ASSERT_TRUE(gripper.has_value());
-    EXPECT_NEAR(gripper->stroke_m, 0.000840, 1e-12);
+    // The check does not see that ASSERT_TRUE returns from the test when the value is missing.
+    EXPECT_NEAR(gripper->stroke_m, 0.000840, 1e-12);  // NOLINT(bugprone-unchecked-optional-access)
 
     std::array<protocol::DriverFeedback, 6> drivers{};
     ASSERT_TRUE(
@@ -76,11 +79,13 @@ TEST(Protocol, DecodesStatusErrorBits)
     const auto status =
         protocol::decodeStatus(frame(0x2A1, {0x01, 0x04, 0x01, 0, 0x01, 0, 0x06, 0x01}));
     ASSERT_TRUE(status.has_value());
+    // NOLINTBEGIN(bugprone-unchecked-optional-access): ASSERT_TRUE above returns when it is empty
     EXPECT_EQ(status->ctrl_mode, 0x01);
     EXPECT_EQ(
         status->arm_status, static_cast<std::uint8_t>(protocol::ArmStatus::kTargetBeyondLimit));
     EXPECT_EQ(status->joint_beyond_limit, 0x06);  // joints 2 and 3
     EXPECT_EQ(status->joint_comm_error, 0x01);    // joint 1
+    // NOLINTEND(bugprone-unchecked-optional-access)
 }
 
 TEST(Protocol, EncodesCommandsLikeTheSdk)
@@ -124,11 +129,11 @@ TEST(Protocol, GripperEffortIsClamped)
 
 TEST(Protocol, ClassifiesCommandIds)
 {
-    for (std::uint32_t id : {0x150U, 0x151U, 0x155U, 0x159U, 0x15AU, 0x471U, 0x474U})
+    for (const std::uint32_t id : {0x150U, 0x151U, 0x155U, 0x159U, 0x15AU, 0x471U, 0x474U})
     {
         EXPECT_TRUE(protocol::isCommand(id)) << std::hex << id;
     }
-    for (std::uint32_t id : {0x2A1U, 0x2A5U, 0x251U, 0x261U, 0x472U, 0x473U, 0x4AFU})
+    for (const std::uint32_t id : {0x2A1U, 0x2A5U, 0x251U, 0x261U, 0x472U, 0x473U, 0x4AFU})
     {
         EXPECT_FALSE(protocol::isCommand(id)) << std::hex << id;
     }

@@ -3,7 +3,18 @@
 #include <algorithm>
 #include <chrono>
 #include <cmath>
+#include <expected>
+#include <iterator>
+#include <memory>
+#include <mutex>
+#include <span>
+#include <stop_token>
+#include <string>
+#include <system_error>
 #include <utility>
+
+#include "piper_driver/can_bus.hpp"
+#include "piper_driver/protocol.hpp"
 
 namespace piper_driver
 {
@@ -68,7 +79,7 @@ void Arm::receiveLoop(const std::stop_token & stop)
             // Bounded: replies are a few frames, and a stray query must not grow this forever.
             if (firmware_raw_.size() < 512)
             {
-                firmware_raw_.append(reinterpret_cast<const char *>(f.data.data()), f.length);
+                firmware_raw_.append(f.data.begin(), std::next(f.data.begin(), f.length));
             }
         }
         else if (protocol::isCommand(f.id))
