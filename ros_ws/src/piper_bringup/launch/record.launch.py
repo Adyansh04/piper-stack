@@ -52,7 +52,8 @@ def generate_launch_description() -> LaunchDescription:
             DeclareLaunchArgument(
                 'bag_dir',
                 default_value='/piper-stack/data/bags',
-                description="Where the bag's directory goes (the checkout's data/, ignored by git).",
+                description="Where the bag's directory goes (the checkout's data/, ignored by "
+                'git).',
             ),
             DeclareLaunchArgument(
                 'use_sim_time',

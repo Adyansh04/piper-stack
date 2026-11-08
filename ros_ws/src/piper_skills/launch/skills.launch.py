@@ -44,7 +44,8 @@ def generate_launch_description() -> LaunchDescription:
                 default_value=PathJoinSubstitution(
                     [FindPackageShare('piper_skills'), 'config', 'skills.yaml']
                 ),
-                description="The skills' parameter YAML. Default: this package's config/skills.yaml.",
+                description="The skills' parameter YAML. Default: this package's "
+                'config/skills.yaml.',
             ),
             Node(
                 package='piper_skills',
