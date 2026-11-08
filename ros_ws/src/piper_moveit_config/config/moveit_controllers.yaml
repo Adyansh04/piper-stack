@@ -1,0 +1,23 @@
+# The ros2_control controllers MoveIt sends trajectories to (piper_bringup/config/controllers.yaml).
+moveit_controller_manager: moveit_simple_controller_manager/MoveItSimpleControllerManager
+
+moveit_simple_controller_manager:
+  controller_names: [arm_controller, gripper_controller]
+  arm_controller:
+    type: FollowJointTrajectory
+    action_ns: follow_joint_trajectory
+    default: true
+    joints: [joint1, joint2, joint3, joint4, joint5, joint6]
+  gripper_controller:
+    type: ParallelGripperCommand
+    action_ns: gripper_cmd
+    default: true
+    joints: [joint7]
+
+trajectory_execution:
+  # The firmware interpolates each target at its own speed scaling, so the arm lags the planned
+  # timing; the controller gives a goal 5 s to settle (goal_time), so MoveIt waits as long.
+  allowed_execution_duration_scaling: 1.5
+  allowed_goal_duration_margin: 5.0
+  # How far the measured start may be from the planned start, in rad.
+  allowed_start_tolerance: 0.02

@@ -25,6 +25,8 @@ arm_controller:
     constraints:
       goal_time: 5.0
       stopped_velocity_tolerance: 0.02
+    # MoveIt Servo streams short trajectories that end moving; MoveIt's own end at rest.
+    allow_nonzero_velocity_at_trajectory_end: true
 
 gripper_controller:
   ros__parameters:

@@ -1,17 +1,24 @@
-"""The Piper's ros2_control stack: robot_state_publisher, the controller_manager, the controllers.
+"""The Piper's stack: robot_state_publisher, the controller_manager, the controllers, MoveIt.
 
 Read-only on the real arm (motors untouched, nothing sent):
     ros2 launch piper_bringup bringup.launch.py hardware:=can rviz:=true
 Commanding the real arm, firmware speed at 10 %:
     ros2 launch piper_bringup bringup.launch.py hardware:=can enable:=true motion:=true
-Without the arm:
-    ros2 launch piper_bringup bringup.launch.py hardware:=mock motion:=true rviz:=true
+Without the arm, planning and jogging in RViz:
+    ros2 launch piper_bringup bringup.launch.py hardware:=mock motion:=true moveit:=true rviz:=true
 """
 
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument
+from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription
 from launch.conditions import IfCondition
-from launch.substitutions import Command, LaunchConfiguration, PathJoinSubstitution
+from launch.launch_description_sources import PythonLaunchDescriptionSource
+from launch.substitutions import (
+    AndSubstitution,
+    Command,
+    LaunchConfiguration,
+    NotSubstitution,
+    PathJoinSubstitution,
+)
 from launch_ros.actions import Node
 from launch_ros.parameter_descriptions import ParameterValue
 from launch_ros.substitutions import FindPackageShare
@@ -19,8 +26,8 @@ from launch_ros.substitutions import FindPackageShare
 
 def generate_launch_description():
     hardware = LaunchConfiguration('hardware')
-    enable = LaunchConfiguration('enable')
     motion = LaunchConfiguration('motion')
+    moveit = LaunchConfiguration('moveit')
     rviz = LaunchConfiguration('rviz')
 
     robot_description = ParameterValue(
@@ -35,7 +42,7 @@ def generate_launch_description():
                 ' can_interface:=',
                 LaunchConfiguration('can_interface'),
                 ' enable_on_activate:=',
-                enable,
+                LaunchConfiguration('enable'),
                 ' speed_percent:=',
                 LaunchConfiguration('speed_percent'),
             ]
@@ -94,10 +101,22 @@ def generate_launch_description():
                 'false: joint states only.',
             ),
             DeclareLaunchArgument(
+                'moveit',
+                default_value='false',
+                choices=['true', 'false'],
+                description='true: also start MoveIt (move_group); needs motion:=true to move.',
+            ),
+            DeclareLaunchArgument(
+                'servo',
+                default_value='false',
+                choices=['true', 'false'],
+                description='moveit:=true only. true: also start MoveIt Servo for jogging.',
+            ),
+            DeclareLaunchArgument(
                 'rviz',
                 default_value='false',
                 choices=['true', 'false'],
-                description='true: open RViz on this display.',
+                description='true: open RViz here, with the MoveIt panel if moveit:=true.',
             ),
             Node(
                 package='robot_state_publisher',
@@ -115,6 +134,15 @@ def generate_launch_description():
             spawner('joint_state_broadcaster'),
             spawner('arm_controller', IfCondition(motion)),
             spawner('gripper_controller', IfCondition(motion)),
+            IncludeLaunchDescription(
+                PythonLaunchDescriptionSource(
+                    PathJoinSubstitution(
+                        [FindPackageShare('piper_moveit_config'), 'launch', 'moveit.launch.py']
+                    )
+                ),
+                launch_arguments={'servo': LaunchConfiguration('servo'), 'rviz': rviz}.items(),
+                condition=IfCondition(moveit),
+            ),
             Node(
                 package='rviz2',
                 executable='rviz2',
@@ -122,7 +150,7 @@ def generate_launch_description():
                     '-d',
                     PathJoinSubstitution([FindPackageShare('piper_bringup'), 'rviz', 'piper.rviz']),
                 ],
-                condition=IfCondition(rviz),
+                condition=IfCondition(AndSubstitution(rviz, NotSubstitution(moveit))),
             ),
         ]
     )
