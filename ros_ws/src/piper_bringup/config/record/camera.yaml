@@ -1,0 +1,23 @@
+# Recording profile `camera` (record.launch.py): the wrist camera's colour and depth images with
+# their camera_info and the frames, for replaying perception. About 30 MB/s at 640 x 480 and 25 Hz
+# before compression: keep these runs short.
+/**/recorder:
+  ros__parameters:
+    record:
+      topics:
+        - /wrist_camera/color/image_raw
+        - /wrist_camera/color/camera_info
+        - /wrist_camera/depth/image_raw
+        - /wrist_camera/depth/camera_info
+        - /joint_states
+        - /robot_description
+        - /tf
+        - /tf_static
+        - /clock
+      # Latched topics whose last message goes into every file of a split bag.
+      repeat_transient_local: [/robot_description, /tf_static]
+    storage:
+      storage_id: "mcap"
+      storage_preset_profile: "zstd_fast"
+      # A new file every 4 GiB, so one file stays easy to copy.
+      max_bagfile_size: 4294967296

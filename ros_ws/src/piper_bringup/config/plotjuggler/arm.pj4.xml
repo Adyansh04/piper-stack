@@ -1,0 +1,101 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<!-- PlotJuggler 4 layout (arm: joints, gripper, control loop): load with plotjuggler4 -l <this file>, then stream with the ROS 2 topic subscriber or open a bag of record.launch.py. Series: topic + "/" + field. -->
+<root binding="generic" format="PlotJuggler" pj4_version="4">
+  <tabbed_widget id="" name="main" parent="main_window">
+    <Tab containers="1" id="a1c3e5f7-0000-4000-8000-000000000001" tab_name="joints">
+      <Container>
+        <DockSplitter count="1" orientation="-" sizes="1.00000000">
+          <DockSplitter count="3" orientation="-" sizes="0.33333333;0.33333333;0.33333333">
+              <DockArea id="a1c3e5f7-0000-4000-8000-000000000002" name="positions (rad)">
+                <plot id="a1c3e5f7-0000-4000-8000-000000000003" line_width="1.0" mode="TimeSeries" style="Lines" title="positions (rad)" tracker_enabled="true">
+                  <range bottom="-1.0" left="0.000000" left_ns="0" right="10.000000" right_ns="10000000000" top="1.0" x_basis="absolute"/>
+                  <curve color="#1f77b4" field="joint1/position" markers_visible="false" topic="/joint_states" visible="true"/>
+                  <curve color="#d62728" field="joint2/position" markers_visible="false" topic="/joint_states" visible="true"/>
+                  <curve color="#2ca02c" field="joint3/position" markers_visible="false" topic="/joint_states" visible="true"/>
+                  <curve color="#ff7f0e" field="joint4/position" markers_visible="false" topic="/joint_states" visible="true"/>
+                  <curve color="#9467bd" field="joint5/position" markers_visible="false" topic="/joint_states" visible="true"/>
+                  <curve color="#8c564b" field="joint6/position" markers_visible="false" topic="/joint_states" visible="true"/>
+                </plot>
+              </DockArea>
+              <DockArea id="a1c3e5f7-0000-4000-8000-000000000004" name="velocities (rad/s)">
+                <plot id="a1c3e5f7-0000-4000-8000-000000000005" line_width="1.0" mode="TimeSeries" style="Lines" title="velocities (rad/s)" tracker_enabled="true">
+                  <range bottom="-1.0" left="0.000000" left_ns="0" right="10.000000" right_ns="10000000000" top="1.0" x_basis="absolute"/>
+                  <curve color="#1f77b4" field="joint1/velocity" markers_visible="false" topic="/joint_states" visible="true"/>
+                  <curve color="#d62728" field="joint2/velocity" markers_visible="false" topic="/joint_states" visible="true"/>
+                  <curve color="#2ca02c" field="joint3/velocity" markers_visible="false" topic="/joint_states" visible="true"/>
+                  <curve color="#ff7f0e" field="joint4/velocity" markers_visible="false" topic="/joint_states" visible="true"/>
+                  <curve color="#9467bd" field="joint5/velocity" markers_visible="false" topic="/joint_states" visible="true"/>
+                  <curve color="#8c564b" field="joint6/velocity" markers_visible="false" topic="/joint_states" visible="true"/>
+                </plot>
+              </DockArea>
+              <DockArea id="a1c3e5f7-0000-4000-8000-000000000006" name="efforts (N m)">
+                <plot id="a1c3e5f7-0000-4000-8000-000000000007" line_width="1.0" mode="TimeSeries" style="Lines" title="efforts (N m)" tracker_enabled="true">
+                  <range bottom="-1.0" left="0.000000" left_ns="0" right="10.000000" right_ns="10000000000" top="1.0" x_basis="absolute"/>
+                  <curve color="#1f77b4" field="joint1/effort" markers_visible="false" topic="/joint_states" visible="true"/>
+                  <curve color="#d62728" field="joint2/effort" markers_visible="false" topic="/joint_states" visible="true"/>
+                  <curve color="#2ca02c" field="joint3/effort" markers_visible="false" topic="/joint_states" visible="true"/>
+                  <curve color="#ff7f0e" field="joint4/effort" markers_visible="false" topic="/joint_states" visible="true"/>
+                  <curve color="#9467bd" field="joint5/effort" markers_visible="false" topic="/joint_states" visible="true"/>
+                  <curve color="#8c564b" field="joint6/effort" markers_visible="false" topic="/joint_states" visible="true"/>
+                </plot>
+              </DockArea>
+          </DockSplitter>
+        </DockSplitter>
+      </Container>
+    </Tab>
+    <Tab containers="1" id="a1c3e5f7-0000-4000-8000-000000000008" tab_name="gripper">
+      <Container>
+        <DockSplitter count="1" orientation="-" sizes="1.00000000">
+          <DockSplitter count="2" orientation="-" sizes="0.50000000;0.50000000">
+              <DockArea id="a1c3e5f7-0000-4000-8000-000000000009" name="finger travel (m)">
+                <plot id="a1c3e5f7-0000-4000-8000-000000000010" line_width="1.0" mode="TimeSeries" style="Lines" title="finger travel (m)" tracker_enabled="true">
+                  <range bottom="-1.0" left="0.000000" left_ns="0" right="10.000000" right_ns="10000000000" top="1.0" x_basis="absolute"/>
+                  <curve color="#1f77b4" field="joint7/position" markers_visible="false" topic="/joint_states" visible="true"/>
+                </plot>
+              </DockArea>
+              <DockArea id="a1c3e5f7-0000-4000-8000-000000000011" name="finger effort">
+                <plot id="a1c3e5f7-0000-4000-8000-000000000012" line_width="1.0" mode="TimeSeries" style="Lines" title="finger effort" tracker_enabled="true">
+                  <range bottom="-1.0" left="0.000000" left_ns="0" right="10.000000" right_ns="10000000000" top="1.0" x_basis="absolute"/>
+                  <curve color="#1f77b4" field="joint7/effort" markers_visible="false" topic="/joint_states" visible="true"/>
+                </plot>
+              </DockArea>
+          </DockSplitter>
+        </DockSplitter>
+      </Container>
+    </Tab>
+    <Tab containers="1" id="a1c3e5f7-0000-4000-8000-000000000013" tab_name="control loop">
+      <Container>
+        <DockSplitter count="1" orientation="-" sizes="1.00000000">
+          <DockSplitter count="3" orientation="-" sizes="0.33333333;0.33333333;0.33333333">
+              <DockArea id="a1c3e5f7-0000-4000-8000-000000000014" name="hardware read and write periodicity (s): the CAN feedback period on the real arm">
+                <plot id="a1c3e5f7-0000-4000-8000-000000000015" line_width="1.0" mode="TimeSeries" style="Lines" title="hardware read and write periodicity (s): the CAN feedback period on the real arm" tracker_enabled="true">
+                  <range bottom="-1.0" left="0.000000" left_ns="0" right="10.000000" right_ns="10000000000" top="1.0" x_basis="absolute"/>
+                  <curve color="#1f77b4" field="piper.stats/read_cycle/periodicity/current_value" markers_visible="false" topic="/controller_manager/statistics/values" visible="true"/>
+                  <curve color="#d62728" field="piper.stats/write_cycle/periodicity/current_value" markers_visible="false" topic="/controller_manager/statistics/values" visible="true"/>
+                </plot>
+              </DockArea>
+              <DockArea id="a1c3e5f7-0000-4000-8000-000000000016" name="controller execution time (s)">
+                <plot id="a1c3e5f7-0000-4000-8000-000000000017" line_width="1.0" mode="TimeSeries" style="Lines" title="controller execution time (s)" tracker_enabled="true">
+                  <range bottom="-1.0" left="0.000000" left_ns="0" right="10.000000" right_ns="10000000000" top="1.0" x_basis="absolute"/>
+                  <curve color="#1f77b4" field="arm_controller.stats/execution_time/current_value" markers_visible="false" topic="/controller_manager/statistics/values" visible="true"/>
+                  <curve color="#d62728" field="gripper_controller.stats/execution_time/current_value" markers_visible="false" topic="/controller_manager/statistics/values" visible="true"/>
+                  <curve color="#2ca02c" field="joint_state_broadcaster.stats/execution_time/current_value" markers_visible="false" topic="/controller_manager/statistics/values" visible="true"/>
+                </plot>
+              </DockArea>
+              <DockArea id="a1c3e5f7-0000-4000-8000-000000000018" name="controller_manager times (s)">
+                <plot id="a1c3e5f7-0000-4000-8000-000000000019" line_width="1.0" mode="TimeSeries" style="Lines" title="controller_manager times (s)" tracker_enabled="true">
+                  <range bottom="-1.0" left="0.000000" left_ns="0" right="10.000000" right_ns="10000000000" top="1.0" x_basis="absolute"/>
+                  <curve color="#1f77b4" field="controller_manager.read_time" markers_visible="false" topic="/controller_manager/statistics/values" visible="true"/>
+                  <curve color="#d62728" field="controller_manager.update_time" markers_visible="false" topic="/controller_manager/statistics/values" visible="true"/>
+                  <curve color="#2ca02c" field="controller_manager.write_time" markers_visible="false" topic="/controller_manager/statistics/values" visible="true"/>
+                  <curve color="#ff7f0e" field="controller_manager.total_time" markers_visible="false" topic="/controller_manager/statistics/values" visible="true"/>
+                </plot>
+              </DockArea>
+          </DockSplitter>
+        </DockSplitter>
+      </Container>
+    </Tab>
+    <currentTabIndex index="0"/>
+  </tabbed_widget>
+  <data_processors/>
+</root>
