@@ -1,0 +1,163 @@
+/**/piper_skills:
+  ros__parameters:
+    # MoveIt's planning frame (the robot's root, the table's frame), the planning group, the link
+    # the skills pose and the wrist camera's colour optical frame (piper_description).
+    planning_frame: "world"
+    arm_group: arm
+    tcp_link: "tcp"
+    camera_frame: "wrist_camera_color_optical_frame"
+    # The SRDF state the arm returns to after a pick or a place.
+    ready_state: ready
+
+    motion:
+      # Speed and acceleration scaling of the skills' moves, 0 to 1 (of 3 rad/s, 0.5 rad/s^2).
+      velocity_scale: 0.3
+      acceleration_scale: 0.3
+      planning_time_s: 5.0
+      attempts: 3
+      ik_timeout_s: 1.0
+      # Longest wait for a service or action server to appear.
+      service_wait_s: 3.0
+
+    gripper:
+      action: /gripper_controller/gripper_cmd
+      joint: joint7
+      # One finger's travel from closed, metres: 0.035 is fully open (70 mm between the fingers).
+      open_m: 0.035
+      closed_m: 0.0
+      # The controller's effort limit (piper_hardware applies its own gripper_effort_nm on the arm).
+      effort: 1.0
+      timeout_s: 15.0
+      # A finger stopping below this travel holds nothing, metres (4 mm between the fingers).
+      held_min_m: 0.002
+      # The fingers may stop this far from the object's width between them, metres.
+      width_tolerance_m: 0.02
+      # Links a held object may touch.
+      touch_links: [gripper_base, link6, link7, link8]
+      # The held object's collision box grows by this much in each dimension, metres.
+      held_padding_m: 0.005
+
+    camera:
+      # Percipio's driver and the simulator publish these (camera_name wrist_camera).
+      colour_topic: /wrist_camera/color/image_raw
+      depth_topic: /wrist_camera/depth/image_raw
+      info_topic: /wrist_camera/color/camera_info
+      # Frames from the first half second after a request are skipped: the arm may still swing.
+      settle_s: 0.5
+      timeout_s: 5.0
+      pair_window_s: 0.05
+      tf_timeout_s: 0.5
+
+    table:
+      # The table's top in the planning frame for MoveIt's collision box: centre [x, y] and size
+      # along x (away from the arm) and y, metres. Must agree with sim/config/sim.yaml's world.table.
+      centre_m: [0.3, 0.0]
+      size_m: [0.8, 1.2]
+      top_z_m: 0.0
+      # The box below the top, metres.
+      thickness_m: 0.05
+
+    workspace:
+      # The part of the top the skills find on and place on, as the arm reaches it: centre [x, y]
+      # and size along x and y, metres. Its thirds across y are the regions left, middle, right.
+      centre_m: [0.3, 0.0]
+      size_m: [0.35, 0.6]
+
+    view:
+      # The colour camera's fields of view at 640 x 480 (fx 401.6 px), degrees.
+      hfov_deg: 77.1
+      vfov_deg: 61.7
+      image_margin: 0.05
+      # Share of the image's bottom the fingers hide.
+      occluded_bottom: 0.0
+      # The workspace views and the SRDF states that show them (from ready the camera looks
+      # straight down at the workspace from 0.31 m), tried in this order when a goal names none.
+      names: [full, middle, left, right]
+      states: [ready, ready, view_left, view_right]
+
+    perception:
+      segment_service: /segment_objects
+      grasp_service: /compute_grasps
+      segment_timeout_s: 60.0
+      grasp_timeout_s: 60.0
+      # Masks scored below this are not objects, 0 to 1 (a goal's min_score overrides it).
+      min_score: 0.5
+
+    cloud:
+      # Objects with fewer points are not used.
+      min_points: 50
+      # Depth readings outside this range are not used, metres.
+      min_depth_m: 0.1
+      max_depth_m: 1.0
+      # The mask shrinks by this many pixels first: its edge mixes object and background.
+      erode_px: 2
+      # Points this far from the mask's median depth are background seen through it, metres.
+      depth_band_m: 0.1
+      # An object's points start this far above the top; separate clusters further than gap apart.
+      above_top_m: 0.006
+      cluster_gap_m: 0.02
+
+    grasp:
+      # Approach angles from straight down, degrees: at most max, a top grasp within top_max; the
+      # closing axis tilted at most max_closing_tilt from level.
+      max_approach_angle_deg: 100.0
+      top_max_angle_deg: 50.0
+      max_closing_tilt_deg: 30.0
+      # The Piper's pads (AgileX meshes): 20 mm wide, the flat 23 mm at the fingertips, 8 mm thick.
+      pad_width_m: 0.02
+      pad_length_m: 0.023
+      finger_thickness_m: 0.008
+      contact_strips: 4
+      # Object widths the fingers take, metres (at most 70 mm open).
+      min_width_m: 0.005
+      max_width_m: 0.065
+      # Fingers stay this far above the table, metres.
+      top_clearance_m: 0.005
+      # How deep the fingers reach over the object: at least min (and min_share of the pads),
+      # at most max (the housing is 72.8 mm behind the tips), metres.
+      min_depth_m: 0.01
+      min_depth_share: 0.3
+      max_depth_m: 0.06
+      side_max_offset_share: 0.25
+      # Ranking: model score + upright x cos(approach) + depth weight x depth - width weight x
+      # opening - contact weight x contact spread.
+      upright_weight: 0.5
+      depth_weight: 10.0
+      side_depth_weight: 40.0
+      width_weight: 20.0
+      contact_weight: 50.0
+
+    pick:
+      # The fingers come in from this far back along the approach and lift this far, metres. With
+      # the gripper straight down the arm reaches 0.08-0.12 m above the top within 0.33 m of its
+      # base, less farther out (IK over the table).
+      pregrasp_m: 0.06
+      lift_m: 0.06
+      # Best grasps checked for reach, and grasps tried before the pick fails.
+      max_candidates: 15
+      attempts: 3
+
+    place:
+      # The object's bottom is released this far above the top; the fingers come from and leave to
+      # this far above the release, metres.
+      release_height_m: 0.01
+      approach_m: 0.06
+      clear_above_m: 0.05
+      # A target moves to the nearest free spot within this distance, metres (a goal's tolerance_m
+      # overrides it).
+      tolerance_m: 0.05
+      # Free space round a spot (at least the object's own radius), grid step, and how much a spot
+      # near the robot is preferred.
+      free_radius_m: 0.06
+      grid_step_m: 0.01
+      near_weight: 0.5
+      # Spots farther than this from the arm's base axis are not used: beyond it the arm cannot
+      # come down straight from approach_m above a release, metres.
+      max_reach_m: 0.33
+      # Depth nearer the camera than this is the gripper or the held object, metres (the top is
+      # 0.31 m away in the views).
+      min_camera_distance_m: 0.2
+      # Points this high above the top take a spot within wrist_radius_m: where the wrist and the
+      # camera come down beside the gripper, metres.
+      wrist_above_m: 0.25
+      wrist_radius_m: 0.08

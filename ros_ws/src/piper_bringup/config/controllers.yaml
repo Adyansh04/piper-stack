@@ -34,6 +34,9 @@ gripper_controller:
     state_interfaces: [position, velocity]
     # How close to the target counts as reached, in m of one finger's travel.
     goal_tolerance: 0.002
+    # Fingers stopped on an object are a grasp, not a failure: slower than the threshold (m/s) for
+    # stall_timeout (s) ends the goal. A finger pressing on an object jitters at 1-3 mm/s in the
+    # simulator's contacts.
     allow_stalling: true
     stall_timeout: 1.0
-    stall_velocity_threshold: 0.001
+    stall_velocity_threshold: 0.005

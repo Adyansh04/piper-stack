@@ -10,9 +10,8 @@ string mode
 float64 x
 float64 y
 
-# Free mode: part of the table to use, as seen from the robot: "any" (the "full" view: the band
-# along the near edge, the view planner's max_depth_m deep, across the whole width), "left",
-# "middle" or "right" (sections of that band).
+# Free mode: part of the table to use, as seen from the robot: "any" (the whole work area, the
+# skills' workspace.* parameters), "left", "middle" or "right" (its thirds across).
 string region
 
 # A target that is taken: the object goes to the nearest free spot at most this far from it, in
