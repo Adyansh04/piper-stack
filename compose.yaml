@@ -59,5 +59,53 @@ services:
               count: all
               capabilities: [gpu, compute, utility, graphics, display]
 
+  # Isaac Sim 6.2 and Isaac Lab 3.0 (docker/sim): `docker compose --profile sim up -d sim`.
+  sim:
+    profiles: [sim]
+    image: piper-sim:local
+    build:
+      context: docker/sim
+      network: host
+    container_name: piper-sim
+    user: "${HOST_UID:-1000}:${HOST_GID:-1000}"
+    init: true
+    restart: "no"
+    network_mode: host
+    ipc: host
+    environment:
+      ACCEPT_EULA: "Y"
+      PRIVACY_CONSENT: "Y"
+      ROS_DOMAIN_ID: ${ROS_DOMAIN_ID:-42}
+      ROS_AUTOMATIC_DISCOVERY_RANGE: LOCALHOST
+      # Isaac's bundled Jazzy (Fast DDS 2) and Lyrical's (Fast DDS 3) read different variables. UDP
+      # on the loopback: shared memory does not cross the two containers.
+      FASTRTPS_DEFAULT_PROFILES_FILE: /piper-stack/sim/config/fastdds_udp_localhost.xml
+      FASTDDS_DEFAULT_PROFILES_FILE: /piper-stack/sim/config/fastdds_udp_localhost.xml
+      DISPLAY: ${DISPLAY:-:0}
+      NVIDIA_DRIVER_CAPABILITIES: all
+    volumes:
+      - type: bind
+        source: .
+        target: /piper-stack
+      - type: bind
+        source: /tmp/.X11-unix
+        target: /tmp/.X11-unix
+      # Shader and asset caches survive the container: a cold start compiles for minutes.
+      - type: volume
+        source: sim-cache
+        target: /home/sim
+      - type: volume
+        source: sim-kit-cache
+        target: /isaac-sim/kit/cache
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu, compute, utility, graphics, display]
+
 volumes:
   ccache:
+  sim-cache:
+  sim-kit-cache:

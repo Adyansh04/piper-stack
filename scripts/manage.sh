@@ -100,11 +100,13 @@ build() {
 run_tests() {
     local select=(--packages-select-regex "${OUR_PACKAGES}")
     (($#)) && select=(--packages-select "$@")
+    # The simulator's own helpers are not a ROS package: their tests run with pytest (no Isaac Sim).
     # shellcheck disable=SC2016 # expanded in the container
     in_container bash -c '
         colcon test "$@" --return-code-on-test-failure --event-handlers console_direct+
         status=$?
         colcon test-result --verbose
+        python3 -m pytest -q -p no:cacheprovider /piper-stack/sim/test || status=1
         exit "${status}"
     ' bash "${select[@]}"
 }

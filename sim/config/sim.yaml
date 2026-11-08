@@ -1,0 +1,79 @@
+# The Piper in Isaac Sim, read by sim.py. Lengths in metres, joint positions in radians.
+
+app:
+  # HEADLESS (true or false) overrides this.
+  headless: true
+  # physx or newton (MuJoCo-Warp); PHYSICS_ENGINE overrides this.
+  engine: physx
+  # Where each engine runs: PhysX's articulations on the CPU, Newton (Warp) on the GPU.
+  device: {physx: cpu, newton: cuda}
+  # Physics steps a second: the joint loop and /clock run at this rate (the arm's CAN feedback
+  # runs at 200 Hz).
+  physics_hz: 200
+  # Frames rendered a second; physics_hz must be a multiple of it.
+  render_hz: 25
+  # true: frames are paced to wall time. false: as fast as the GPU renders.
+  real_time: true
+  # With real_time: simulation seconds per wall second (0.5 tests a stack on a slow simulator).
+  real_time_factor: 1.0
+  # Wall time between two status lines (real-time factor, frame rate, physics callback cost).
+  status_period_s: 10.0
+  # Stop after this long, seconds (tests); null runs until stopped.
+  run_s: null
+
+world:
+  light_intensity: 1000.0
+  floor_colour: [0.35, 0.35, 0.37]
+  # The arm stands at the table's edge: the robot's base at the world origin on the top (z 0).
+  table:
+    height_m: 0.75
+    # Along x (away from the arm) and y.
+    size_m: [0.8, 1.2]
+    centre_m: [0.3, 0.0]
+    colour: [0.62, 0.48, 0.33]
+  # Friction of the cubes (PLA on the table and the gripper's pads).
+  cube_friction: {static: 0.8, dynamic: 0.6}
+  # 5 cm cubes in front of the arm, [x_m, y_m] on the table.
+  cubes:
+    - {name: red_cube, colour: [0.8, 0.1, 0.1], size_m: 0.05, xy_m: [0.30, -0.10], mass_kg: 0.05}
+    - {name: green_cube, colour: [0.1, 0.65, 0.2], size_m: 0.05, xy_m: [0.30, 0.10], mass_kg: 0.05}
+    - {name: blue_cube, colour: [0.1, 0.25, 0.8], size_m: 0.05, xy_m: [0.38, 0.0], mass_kg: 0.05}
+    - {name: yellow_cube, colour: [0.9, 0.8, 0.1], size_m: 0.05, xy_m: [0.24, 0.0], mass_kg: 0.05}
+  # Simulation time between two ground truth messages (sim/objects), seconds.
+  ground_truth_period_s: 0.5
+
+camera:
+  enabled: true
+  # The optical frame the camera sits at, in the robot description (on the wrist mount).
+  frame: wrist_camera_color_optical_frame
+  # Topics and frames as Percipio's driver publishes them (camera.launch.py, camera_name
+  # wrist_camera); depth is aligned to colour.
+  namespace: wrist_camera
+  color_frame_id: wrist_camera_color_optical_frame
+  depth_frame_id: wrist_camera_depth_optical_frame
+  # The real camera's default mode (camera.launch.py) and its colour camera's focal length there
+  # (factory calibration 803.1 px at 1280 x 960). The sim's principal point is centred and its
+  # image undistorted; its camera_info says so.
+  width_px: 640
+  height_px: 480
+  fx_px: 401.56
+  # Render range, metres: nearer geometry (the camera's own housing) is not drawn.
+  near_m: 0.05
+  far_m: 5.0
+  # Frames a second; the nearest of render_hz / n is used.
+  rate_hz: 25.0
+
+robot:
+  # The expanded robot description (scripts/run/sim.sh writes it from piper_description).
+  urdf: /piper-stack/data/sim/piper.urdf
+  # Converted USDs, one per URDF, mesh set, drive set and Isaac Sim version.
+  usd_cache: /piper-stack/data/sim/usd
+  packages:
+    piper_description: /piper-stack/ros_ws/src/piper_description
+  # Position drives (force), per joint regex: stiffness in N m/rad or N/m, damping in N m s/rad or
+  # N s/m. To be fitted to the arm (sysid at the lab).
+  # 4000 N m/rad keeps the gravity sag of joint 3 near 1.3 mrad (5.4 N m at the spike's pose).
+  drives:
+    target: position
+    stiffness: {"joint[1-6]": 4000.0, "joint[78]": 2000.0}
+    damping: {"joint[1-6]": 50.0, "joint[78]": 100.0}
