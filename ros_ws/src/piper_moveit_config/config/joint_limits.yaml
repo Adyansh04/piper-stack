@@ -6,8 +6,13 @@ default_acceleration_scaling_factor: 1.0
 
 joint_limits:
   joint1: {has_velocity_limits: true, max_velocity: 3.0, has_acceleration_limits: true, max_acceleration: 0.5}
-  joint2: {has_velocity_limits: true, max_velocity: 3.0, has_acceleration_limits: true, max_acceleration: 0.5}
-  joint3: {has_velocity_limits: true, max_velocity: 3.0, has_acceleration_limits: true, max_acceleration: 0.5}
+  # The rest pose sits on joint2's lower and joint3's upper limit, and gravity or encoder noise
+  # reads a hair past them, which MoveIt refuses as a start state (it allows no margin): 10 mrad of
+  # slack on those sides. ros2_control still clamps commands to the URDF's limits.
+  joint2: {has_velocity_limits: true, max_velocity: 3.0, has_acceleration_limits: true, max_acceleration: 0.5,
+           has_position_limits: true, min_position: -0.01, max_position: 3.14}
+  joint3: {has_velocity_limits: true, max_velocity: 3.0, has_acceleration_limits: true, max_acceleration: 0.5,
+           has_position_limits: true, min_position: -2.967, max_position: 0.01}
   joint4: {has_velocity_limits: true, max_velocity: 3.0, has_acceleration_limits: true, max_acceleration: 0.5}
   joint5: {has_velocity_limits: true, max_velocity: 3.0, has_acceleration_limits: true, max_acceleration: 0.5}
   joint6: {has_velocity_limits: true, max_velocity: 3.0, has_acceleration_limits: true, max_acceleration: 0.5}
