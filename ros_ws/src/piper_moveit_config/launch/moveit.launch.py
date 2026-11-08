@@ -11,8 +11,9 @@ import os
 import yaml
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument
+from launch.actions import DeclareLaunchArgument, RegisterEventHandler
 from launch.conditions import IfCondition
+from launch.event_handlers import OnProcessIO
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
 from launch_ros.parameter_descriptions import ParameterValue
@@ -53,6 +54,33 @@ def generate_launch_description():
     ]
     with open(os.path.join(share, 'config', 'servo_kinematics.yaml')) as f:
         servo_kinematics = {'robot_description_kinematics': yaml.safe_load(f)}
+    move_group = Node(
+        package='moveit_ros_move_group',
+        executable='move_group',
+        parameters=[config.to_dict(), sim_time],
+        output='screen',
+    )
+    servo = Node(
+        package='moveit_servo',
+        executable='servo_node',
+        name='servo_node',
+        parameters=[
+            os.path.join(share, 'config', 'servo.yaml'),
+            config.robot_description,
+            config.robot_description_semantic,
+            servo_kinematics,
+            config.joint_limits,
+            sim_time,
+        ],
+        output='screen',
+        condition=IfCondition(LaunchConfiguration('servo')),
+    )
+
+    # Servo waits for its first planning scene update: the scene it requests from move_group at
+    # start, or a change of the joint states, which an arm at rest (the mock) never has. So it
+    # starts once move_group serves the scene.
+    def start_servo_when_ready(event):
+        return [servo] if b'You can start planning now' in event.text else None
 
     return LaunchDescription(
         [
@@ -74,26 +102,13 @@ def generate_launch_description():
                 choices=['true', 'false'],
                 description='true: follow /clock from the simulator.',
             ),
-            Node(
-                package='moveit_ros_move_group',
-                executable='move_group',
-                parameters=[config.to_dict(), sim_time],
-                output='screen',
-            ),
-            Node(
-                package='moveit_servo',
-                executable='servo_node',
-                name='servo_node',
-                parameters=[
-                    os.path.join(share, 'config', 'servo.yaml'),
-                    config.robot_description,
-                    config.robot_description_semantic,
-                    servo_kinematics,
-                    config.joint_limits,
-                    sim_time,
-                ],
-                output='screen',
-                condition=IfCondition(LaunchConfiguration('servo')),
+            move_group,
+            RegisterEventHandler(
+                OnProcessIO(
+                    target_action=move_group,
+                    on_stdout=start_servo_when_ready,
+                    on_stderr=start_servo_when_ready,
+                )
             ),
             Node(
                 package='rviz2',
