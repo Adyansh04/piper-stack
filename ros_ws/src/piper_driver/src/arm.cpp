@@ -3,6 +3,8 @@
 #include <algorithm>
 #include <chrono>
 #include <cmath>
+#include <cstddef>
+#include <cstdint>
 #include <expected>
 #include <iterator>
 #include <memory>
@@ -73,6 +75,12 @@ void Arm::receiveLoop(const std::stop_token & stop)
         {
             // Decoded into state in place.
         }
+        else if (auto levels = protocol::decodeCollisionLevels(f);
+                 levels && f.id == protocol::id::kCollisionReply)
+        {
+            state.collision_levels = *levels;
+            state.collision_levels_known = true;
+        }
         else if (f.id == kFirmware && f.data[0] != 0x01)
         {
             const std::scoped_lock lock(firmware_mutex_);
@@ -102,9 +110,46 @@ std::expected<void, std::error_code> Arm::enable(bool on) noexcept
 }
 
 std::expected<void, std::error_code> Arm::setMode(
-    protocol::CtrlMode ctrl, protocol::MoveMode move, int speed_percent) noexcept
+    protocol::CtrlMode ctrl, protocol::MoveMode move, int speed_percent, bool mit) noexcept
 {
-    return send(protocol::encodeMode(ctrl, move, speed_percent));
+    return send(protocol::encodeMode(ctrl, move, speed_percent, mit));
+}
+
+std::expected<void, std::error_code> Arm::commandMit(
+    std::span<const protocol::MitCommand, protocol::kJointCount> commands) noexcept
+{
+    const auto finite = [](const protocol::MitCommand & c) {
+        return std::isfinite(c.position_rad) && std::isfinite(c.velocity_rad_s)
+               && std::isfinite(c.kp) && std::isfinite(c.kd) && std::isfinite(c.torque_nm);
+    };
+    if (!std::ranges::all_of(commands, finite))
+    {
+        return std::unexpected(std::make_error_code(std::errc::invalid_argument));
+    }
+    for (std::size_t joint = 0; joint < protocol::kJointCount; ++joint)
+    {
+        if (auto sent = send(protocol::encodeMit(joint, commands[joint])); !sent)
+        {
+            return sent;
+        }
+    }
+    return {};
+}
+
+std::expected<void, std::error_code> Arm::setCollisionLevels(
+    std::span<const std::uint8_t, protocol::kJointCount> levels) noexcept
+{
+    return send(protocol::encodeCollisionLevels(levels));
+}
+
+std::expected<void, std::error_code> Arm::requestCollisionLevels() noexcept
+{
+    return send(protocol::encodeCollisionLevelQuery());
+}
+
+std::expected<void, std::error_code> Arm::setEndLoad(protocol::EndLoad load) noexcept
+{
+    return send(protocol::encodeEndLoad(load));
 }
 
 std::expected<void, std::error_code> Arm::commandJoints(

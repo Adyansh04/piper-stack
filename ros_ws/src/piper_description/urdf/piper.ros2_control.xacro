@@ -2,12 +2,17 @@
 <!-- The Piper's ros2_control system. hardware: mock (ros2_control's mock, no arm) or can (the real
      arm through piper_hardware). Position limits are the tighter of the URDF's and the firmware's. -->
 <robot xmlns:xacro="http://www.ros.org/wiki/xacro">
-  <xacro:macro name="piper_joint" params="name lower upper">
+  <xacro:macro name="piper_joint" params="name lower upper mit:=false">
     <joint name="${name}">
       <command_interface name="position">
         <param name="min">${lower}</param>
         <param name="max">${upper}</param>
       </command_interface>
+      <!-- MIT mode: velocity target and feed-forward torque, clamped by the plugin. -->
+      <xacro:if value="${mit}">
+        <command_interface name="velocity"/>
+        <command_interface name="effort"/>
+      </xacro:if>
       <state_interface name="position"/>
       <state_interface name="velocity"/>
       <state_interface name="effort"/>
@@ -15,7 +20,8 @@
   </xacro:macro>
 
   <xacro:macro name="piper_ros2_control"
-               params="prefix hardware can_interface enable_on_activate speed_percent">
+               params="prefix hardware can_interface enable_on_activate speed_percent
+                       motion_mode:=joint collision_level:=-1 end_load:=''">
     <ros2_control name="${prefix}piper" type="system">
       <hardware>
         <xacro:if value="${hardware == 'mock'}">
@@ -31,14 +37,31 @@
           <!-- No new joint frame for this long is an error; the arm sends them at 200 Hz. -->
           <param name="feedback_timeout_ms">50</param>
           <param name="gripper_effort_nm">1.0</param>
+          <!-- joint (MOVE J), cpv (MOVE CPV, streaming) or mit (per-joint impedance). -->
+          <param name="motion_mode">${motion_mode}</param>
+          <!-- MIT gains (N m/rad, N m s/rad) and clamps of the velocity and effort commands. -->
+          <param name="mit_kp">10.0</param>
+          <param name="mit_kd">0.8</param>
+          <param name="mit_max_torque_nm">2.0</param>
+          <param name="mit_max_velocity_rad_s">3.0</param>
+          <!-- Set at activation: 0 off to 8 most sensitive, -1 leaves the firmware's. -->
+          <param name="collision_level">${collision_level}</param>
+          <!-- Set at activation: empty, half or full; nothing leaves the firmware's. -->
+          <param name="end_load">${end_load}</param>
         </xacro:if>
       </hardware>
-      <xacro:piper_joint name="${prefix}joint1" lower="-2.618" upper="2.618"/>
-      <xacro:piper_joint name="${prefix}joint2" lower="0.0" upper="3.14"/>
-      <xacro:piper_joint name="${prefix}joint3" lower="-2.967" upper="0.0"/>
-      <xacro:piper_joint name="${prefix}joint4" lower="-1.745" upper="1.745"/>
-      <xacro:piper_joint name="${prefix}joint5" lower="-1.22" upper="1.22"/>
-      <xacro:piper_joint name="${prefix}joint6" lower="-2.0944" upper="2.0944"/>
+      <xacro:piper_joint name="${prefix}joint1" lower="-2.618" upper="2.618"
+                         mit="${motion_mode == 'mit'}"/>
+      <xacro:piper_joint name="${prefix}joint2" lower="0.0" upper="3.14"
+                         mit="${motion_mode == 'mit'}"/>
+      <xacro:piper_joint name="${prefix}joint3" lower="-2.967" upper="0.0"
+                         mit="${motion_mode == 'mit'}"/>
+      <xacro:piper_joint name="${prefix}joint4" lower="-1.745" upper="1.745"
+                         mit="${motion_mode == 'mit'}"/>
+      <xacro:piper_joint name="${prefix}joint5" lower="-1.22" upper="1.22"
+                         mit="${motion_mode == 'mit'}"/>
+      <xacro:piper_joint name="${prefix}joint6" lower="-2.0944" upper="2.0944"
+                         mit="${motion_mode == 'mit'}"/>
       <!-- One finger's travel; the opening between the fingers is twice this. -->
       <xacro:piper_joint name="${prefix}joint7" lower="0.0" upper="0.035"/>
     </ros2_control>

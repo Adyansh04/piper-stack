@@ -31,6 +31,9 @@ struct ArmState
     std::uint64_t foreign_commands =
         0;                         ///< Command frames on the bus that this driver did not send.
     std::uint64_t bus_errors = 0;  ///< Controller error reports (bus-off, error passive).
+    /// Collision protection level per joint, from the newest 0x47B reply (requestCollisionLevels()).
+    std::array<std::uint8_t, protocol::kJointCount> collision_levels{};
+    bool collision_levels_known = false;  ///< Whether a 0x47B reply has arrived.
 };
 
 /**
@@ -82,10 +85,46 @@ public:
    * @param[in] ctrl Control mode; kCan accepts commands from this driver.
    * @param[in] move Motion mode.
    * @param[in] speed_percent Firmware speed scaling, 0 to 100.
+   * @param[in] mit True for MIT commands (commandMit()), false for position commands.
    * @return Nothing, or the send error.
    */
     std::expected<void, std::error_code> setMode(
-        protocol::CtrlMode ctrl, protocol::MoveMode move, int speed_percent) noexcept;
+        protocol::CtrlMode ctrl,
+        protocol::MoveMode move,
+        int speed_percent,
+        bool mit = false) noexcept;
+
+    /**
+   * @brief Sends one MIT (per-joint impedance) command per joint; fields are clamped to the
+   * firmware's ranges.
+   * @param[in] commands Command per joint.
+   * @return Nothing, `invalid_argument` if a value is not finite, or the send error.
+   * @warning The motors apply kp, kd and the feed-forward torque directly: high gains on a
+   *          wrong target move the arm hard. Only in MIT mode (setMode with mit true).
+   */
+    std::expected<void, std::error_code> commandMit(
+        std::span<const protocol::MitCommand, protocol::kJointCount> commands) noexcept;
+
+    /**
+   * @brief Sets the collision protection level of each joint (0 off, up to 8).
+   * @param[in] levels Level per joint, clamped to 0 to 8.
+   * @return Nothing, or the send error.
+   */
+    std::expected<void, std::error_code> setCollisionLevels(
+        std::span<const std::uint8_t, protocol::kJointCount> levels) noexcept;
+
+    /**
+   * @brief Asks the arm for its collision levels; ArmState::collision_levels holds the reply.
+   * @return Nothing, or the send error.
+   */
+    std::expected<void, std::error_code> requestCollisionLevels() noexcept;
+
+    /**
+   * @brief Sets the payload class the firmware compensates for.
+   * @param[in] load Empty, half or full load.
+   * @return Nothing, or the send error.
+   */
+    std::expected<void, std::error_code> setEndLoad(protocol::EndLoad load) noexcept;
 
     /**
    * @brief Sends joint targets.

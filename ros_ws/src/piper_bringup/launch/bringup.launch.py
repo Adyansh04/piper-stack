@@ -45,6 +45,8 @@ def generate_launch_description():
                 LaunchConfiguration('enable'),
                 ' speed_percent:=',
                 LaunchConfiguration('speed_percent'),
+                ' motion_mode:=',
+                LaunchConfiguration('motion_mode'),
             ]
         ),
         value_type=str,
@@ -92,6 +94,13 @@ def generate_launch_description():
                 'speed_percent',
                 default_value='10',
                 description='Firmware speed scaling for MOVE J, 1-100 percent of 3 rad/s.',
+            ),
+            DeclareLaunchArgument(
+                'motion_mode',
+                default_value='joint',
+                choices=['joint', 'cpv', 'mit'],
+                description='hardware:=can only. joint: MOVE J, the firmware interpolates each '
+                'target. cpv: MOVE CPV streaming. mit: per-joint impedance (gains in the URDF).',
             ),
             DeclareLaunchArgument(
                 'motion',

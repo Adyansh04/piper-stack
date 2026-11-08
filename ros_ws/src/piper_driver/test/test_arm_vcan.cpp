@@ -7,6 +7,8 @@
 #include <array>
 #include <chrono>
 #include <cmath>
+#include <cstddef>
+#include <cstdint>
 #include <memory>
 #include <system_error>
 #include <thread>
@@ -129,4 +131,31 @@ TEST_F(ArmOnVcan, ReadsFirmwareText)
 {
     ASSERT_TRUE(arm().requestFirmware());
     EXPECT_TRUE(waitFor([&] { return arm().firmwareText() == "S-V1.8-2"; }, 1s));
+}
+
+TEST_F(ArmOnVcan, FollowsMitCommandsInMitMode)
+{
+    ASSERT_TRUE(arm().enable(true));
+    ASSERT_TRUE(arm().setMode(protocol::CtrlMode::kCan, protocol::MoveMode::kMit, 100, true));
+    std::array<protocol::MitCommand, 6> commands{};
+    for (std::size_t j = 0; j < commands.size(); ++j)
+    {
+        commands.at(j) = {.position_rad = fake().positions().at(j), .kp = 10.0, .kd = 0.8};
+    }
+    commands[1].position_rad = 0.3;
+    ASSERT_TRUE(arm().commandMit(commands));
+    EXPECT_TRUE(waitFor([&] { return std::abs(arm().latest().position_rad[1] - 0.3) < 1e-3; }, 2s));
+    commands[2].kp = std::nan("");
+    EXPECT_FALSE(arm().commandMit(commands).has_value());
+}
+
+TEST_F(ArmOnVcan, SetsAndReadsBackCollisionLevelsAndLoad)
+{
+    const std::array<std::uint8_t, 6> levels{1, 2, 3, 4, 5, 6};
+    ASSERT_TRUE(arm().setCollisionLevels(levels));
+    ASSERT_TRUE(arm().requestCollisionLevels());
+    EXPECT_TRUE(waitFor([&] { return arm().latest().collision_levels_known; }, 1s));
+    EXPECT_EQ(arm().latest().collision_levels, levels);
+    ASSERT_TRUE(arm().setEndLoad(protocol::EndLoad::kFull));
+    EXPECT_TRUE(waitFor([&] { return fake().endLoad() == 0x02; }, 1s));
 }
