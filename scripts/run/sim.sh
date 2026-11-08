@@ -24,7 +24,8 @@ parse_args "$@"
 
 readonly BRINGUP="ros2 launch piper_bringup bringup.launch.py hardware:=isaac"
 # shellcheck disable=SC2016 # expanded in the keyboard pane, inside the container
-readonly JOG='ros2 run piper_teleop keyboard_jog --ros-args --params-file "$(ros2 pkg prefix piper_teleop)/share/piper_teleop/config/keyboard_jog.yaml"'
+# On the simulator's clock: Servo drops a jog once its stamp is old, which a wall-clock stamp never is.
+readonly JOG='ros2 run piper_teleop keyboard_jog --ros-args --params-file "$(ros2 pkg prefix piper_teleop)/share/piper_teleop/config/keyboard_jog.yaml" -p use_sim_time:=true'
 # The robot description the simulator imports, written by the dev container (it has xacro).
 readonly URDF='mkdir -p /piper-stack/data/sim && xacro /piper-stack/ros_ws/src/piper_description/urdf/piper.urdf.xacro > /piper-stack/data/sim/piper.urdf'
 readonly SIM="./scripts/manage.sh exec bash -c '${URDF}' && HOST_UID=\$(id -u) HOST_GID=\$(id -g) docker compose --profile sim up -d sim && docker exec -it -e HEADLESS=\${HEADLESS:-true} -e PHYSICS_ENGINE=\${PHYSICS_ENGINE:-physx} -e SIM_MODE=\${SIM_MODE:-control} -e LIVESTREAM=\${LIVESTREAM:-false} piper-sim /isaac-sim/python.sh /piper-stack/sim/sim.py"
