@@ -1,7 +1,9 @@
 <?xml version="1.0"?>
 <!-- The Piper arm and gripper, from AgileX's piper_description (piper_ros, branch humble, MIT):
      link and joint names take a prefix; velocity limits are the firmware's 3 rad/s; joint8 mimics
-     joint7. -->
+     joint7. Colours as on the real arm (AgileX's product photos): black housings, base and
+     fingers (the visual meshes named gray), brushed aluminium tubes, so the cameras see the arm
+     the simulator draws. -->
 <robot xmlns:xacro="http://www.ros.org/wiki/xacro">
   <xacro:macro name="piper_arm" params="prefix">
   <link
@@ -15,8 +17,8 @@
       <geometry>
         <mesh filename="package://piper_description/meshes/visual/base_link_gray.stl" />
       </geometry>
-      <material name="piper_gray_mat">
-        <color rgba="0.59 0.59 0.59 1" />
+      <material name="piper_housing_mat">
+        <color rgba="0.05 0.05 0.05 1" />
       </material>
     </visual>
     <collision>
@@ -40,8 +42,8 @@
       <geometry>
         <mesh filename="package://piper_description/meshes/visual/link1_gray.stl" />
       </geometry>
-      <material name="piper_gray_mat">
-        <color rgba="0.59 0.59 0.59 1" />
+      <material name="piper_housing_mat">
+        <color rgba="0.05 0.05 0.05 1" />
       </material>
     </visual>
     <collision>
@@ -99,16 +101,16 @@
       <geometry>
         <mesh filename="package://piper_description/meshes/visual/link2_gray.stl" />
       </geometry>
-      <material name="piper_gray_mat">
-        <color rgba="0.59 0.59 0.59 1" />
+      <material name="piper_housing_mat">
+        <color rgba="0.05 0.05 0.05 1" />
       </material>
     </visual>
     <visual>
       <geometry>
         <mesh filename="package://piper_description/meshes/visual/link2_light_medium_gray.stl" />
       </geometry>
-      <material name="piper_light_medium_gray_mat">
-        <color rgba="0.85 0.85 0.85 1" />
+      <material name="piper_aluminium_mat">
+        <color rgba="0.72 0.72 0.74 1" />
       </material>
     </visual>
     <visual>
@@ -167,8 +169,8 @@
       <geometry>
         <mesh filename="package://piper_description/meshes/visual/link3_gray.stl" />
       </geometry>
-      <material name="piper_gray_mat">
-        <color rgba="0.59 0.59 0.59 1" />
+      <material name="piper_housing_mat">
+        <color rgba="0.05 0.05 0.05 1" />
       </material>
     </visual>
     <visual>
@@ -183,8 +185,8 @@
       <geometry>
         <mesh filename="package://piper_description/meshes/visual/link3_white.stl" />
       </geometry>
-      <material name="piper_white_mat">
-        <color rgba="1 1 1 1" />
+      <material name="piper_aluminium_mat">
+        <color rgba="0.72 0.72 0.74 1" />
       </material>
     </visual>
     <collision>
@@ -235,8 +237,8 @@
       <geometry>
         <mesh filename="package://piper_description/meshes/visual/link4_gray.stl" />
       </geometry>
-      <material name="piper_gray_mat">
-        <color rgba="0.59 0.59 0.59 1" />
+      <material name="piper_housing_mat">
+        <color rgba="0.05 0.05 0.05 1" />
       </material>
     </visual>
     <collision>
@@ -294,16 +296,16 @@
       <geometry>
         <mesh filename="package://piper_description/meshes/visual/link5_gray.stl" />
       </geometry>
-      <material name="piper_gray_mat">
-        <color rgba="0.59 0.59 0.59 1" />
+      <material name="piper_housing_mat">
+        <color rgba="0.05 0.05 0.05 1" />
       </material>
     </visual>
     <visual>
       <geometry>
         <mesh filename="package://piper_description/meshes/visual/link5_light_gray.stl" />
       </geometry>
-      <material name="piper_light_gray_mat">
-        <color rgba="0.98 0.98 0.98 1" />
+      <material name="piper_aluminium_mat">
+        <color rgba="0.72 0.72 0.74 1" />
       </material>
     </visual>
     <collision>
@@ -345,8 +347,8 @@
       <geometry>
         <mesh filename="package://piper_description/meshes/visual/link6_gray.stl" />
       </geometry>
-      <material name="piper_gray_mat">
-        <color rgba="0.59 0.59 0.59 1" />
+      <material name="piper_housing_mat">
+        <color rgba="0.05 0.05 0.05 1" />
       </material>
     </visual>
     <collision>
@@ -434,8 +436,8 @@
       <geometry>
         <mesh filename="package://piper_description/meshes/visual/link7_gray.stl" />
       </geometry>
-      <material name="piper_gray_mat">
-        <color rgba="0.59 0.59 0.59 1" />
+      <material name="piper_housing_mat">
+        <color rgba="0.05 0.05 0.05 1" />
       </material>
     </visual>
     <collision>
@@ -486,8 +488,8 @@
       <geometry>
         <mesh filename="package://piper_description/meshes/visual/link8_gray.stl" />
       </geometry>
-      <material name="piper_gray_mat">
-        <color rgba="0.59 0.59 0.59 1" />
+      <material name="piper_housing_mat">
+        <color rgba="0.05 0.05 0.05 1" />
       </material>
     </visual>
     <collision>

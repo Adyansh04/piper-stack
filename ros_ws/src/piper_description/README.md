@@ -39,7 +39,8 @@ the camera are estimates until the hand-eye calibration at the arm.
   [piper_ros](https://github.com/agilexrobotics/piper_ros) (MIT).
 - `meshes/visual/`: coloured visual meshes from
   [MuJoCo Menagerie's agilex_piper](https://github.com/google-deepmind/mujoco_menagerie/tree/main/agilex_piper)
-  (MIT), merged per link and colour.
+  (MIT), merged per link and colour. The xacro colours them as the real arm is: black housings,
+  base and fingers, brushed aluminium tubes.
 - `meshes/camera_mount.stl`: the wrist camera mount, from its STEP model.
 
 ## Tests
