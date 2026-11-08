@@ -17,6 +17,7 @@ find_package(rclcpp REQUIRED)
 find_package(rclcpp_components REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(ZLIB REQUIRED)
+find_package(cppzmq REQUIRED)
 # The engine needs CUDA and TensorRT; without them only the CPU parts (tokenizer, tensor types,
 # request checks) and their tests build. TensorRT ships no CMake package: its libraries come from
 # NVIDIA's apt repository.
@@ -91,6 +92,39 @@ if(SAM3_WITH_ENGINE)
   )
 endif()
 
+# The GraspGenX server's client and the node that puts the server on the ROS graph.
+add_library(piper_graspgenx_client STATIC src/graspgenx_client.cpp)
+set_target_properties(piper_graspgenx_client PROPERTIES POSITION_INDEPENDENT_CODE ON)
+target_include_directories(piper_graspgenx_client PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+)
+target_link_libraries(piper_graspgenx_client PUBLIC cppzmq)
+piper_target_defaults(piper_graspgenx_client)
+
+add_library(grasp_generation_component SHARED src/grasp_generation_node.cpp)
+target_link_libraries(grasp_generation_component PRIVATE
+  piper_graspgenx_client
+  rclcpp::rclcpp
+  rclcpp_components::component
+  ${piper_msgs_TARGETS}
+  ${sensor_msgs_TARGETS}
+)
+piper_target_defaults(grasp_generation_component)
+# A request blocks its callback for up to timeout_s.
+rclcpp_components_register_node(grasp_generation_component
+  PLUGIN "piper_perception::GraspGenerationNode"
+  EXECUTABLE grasp_generation_node
+  EXECUTOR MultiThreadedExecutor
+)
+install(TARGETS grasp_generation_component
+  ARCHIVE DESTINATION lib
+  LIBRARY DESTINATION lib
+  RUNTIME DESTINATION bin
+)
+# The server runs in the GraspGenX venv (/opt/graspgenx-venv), started by its launch file.
+install(FILES graspgenx/graspgenx_server.py graspgenx/frames.py
+  DESTINATION share/${PROJECT_NAME}/graspgenx)
+
 install(DIRECTORY include/ DESTINATION include/${PROJECT_NAME})
 install(DIRECTORY config launch resources DESTINATION share/${PROJECT_NAME})
 # Documentation of the export: it runs in a venv with torch and Meta's sam3, not in this image.
@@ -103,6 +137,24 @@ if(BUILD_TESTING)
   target_compile_definitions(test_sam3_cpu PRIVATE
     SAM3_VOCABULARY="${CMAKE_CURRENT_SOURCE_DIR}/resources/bpe_simple_vocab_16e6.txt.gz")
   piper_target_defaults(test_sam3_cpu)
+
+  ament_add_gtest(test_graspgenx_client test/test_graspgenx_client.cpp)
+  target_link_libraries(test_graspgenx_client piper_graspgenx_client)
+  piper_target_defaults(test_graspgenx_client)
+
+  # The server's tests need its venv's Python 3.12 (numpy, scipy, zmq), and must not see ROS's
+  # Python 3.14 packages or their pytest plugins.
+  set(GRASPGENX_PYTHON /opt/graspgenx-venv/bin/python)
+  if(EXISTS ${GRASPGENX_PYTHON})
+    find_package(ament_cmake_pytest REQUIRED)
+    ament_add_pytest_test(test_graspgenx_server graspgenx
+      PYTHON_EXECUTABLE ${GRASPGENX_PYTHON}
+      ENV PYTHONPATH= PYTEST_DISABLE_PLUGIN_AUTOLOAD=1
+      TIMEOUT 120
+    )
+  else()
+    message(WARNING "piper_perception: no ${GRASPGENX_PYTHON}, the GraspGenX server's tests are skipped")
+  endif()
 
   if(SAM3_WITH_ENGINE)
     # Needs a GPU and the engines: built for manual runs, never registered with ctest.

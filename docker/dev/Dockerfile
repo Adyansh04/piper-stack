@@ -72,6 +72,16 @@ ENV PATH=/usr/local/cuda/bin:${PATH}
 ARG UV_VERSION=0.13.5
 RUN curl -LsSf "https://astral.sh/uv/${UV_VERSION}/install.sh" | env UV_INSTALL_DIR=/usr/local/bin sh
 
+# The GraspGenX server's Python 3.12 environment, from its locked project (graspgenx/): GraspGenX's
+# torch has no wheels for Lyrical's Python 3.14. The import check points GraspGenX's setup hook at
+# existing directories, or it would clone its checkpoints from Hugging Face during the build.
+ENV UV_PYTHON_INSTALL_DIR=/opt/uv-python
+COPY graspgenx/pyproject.toml graspgenx/uv.lock /opt/graspgenx/
+RUN UV_PROJECT_ENVIRONMENT=/opt/graspgenx-venv uv sync --project /opt/graspgenx --locked --no-cache \
+        --python 3.12 \
+    && GRASPGENX_CHECKPOINT_DIR=/opt/graspgenx GRASPGENX_GRIPPER_CFG_DIR=/opt/graspgenx \
+        /opt/graspgenx-venv/bin/python -c "import graspgenx.x_grippers, torch, zmq, yaml"
+
 # Linters for the shell scripts and the Python (scripts/manage.sh lint).
 ARG RUFF_VERSION=0.17.4
 RUN apt-get update && apt-get install -y --no-install-recommends shellcheck \

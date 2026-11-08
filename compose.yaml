@@ -46,6 +46,11 @@ services:
       - type: volume
         source: ccache
         target: /home/ubuntu/.cache/ccache
+      # Model weights: sam3/ (SAM 3.1 ONNX; its TensorRT engines are built next to them on the
+      # first start, so writable) and graspgenx/ (GraspGenX's release checkpoints, gen/ and dis/).
+      - type: bind
+        source: ${PIPER_MODELS:-${HOME}/models}
+        target: /models
     deploy:
       resources:
         reservations:

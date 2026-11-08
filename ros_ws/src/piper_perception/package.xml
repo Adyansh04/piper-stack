@@ -3,7 +3,7 @@
 <package format="3">
   <name>piper_perception</name>
   <version>0.1.0</version>
-  <description>SAM 3.1 open-vocabulary instance segmentation from C++ with TensorRT, served as the segment_objects service.</description>
+  <description>Open-vocabulary instance segmentation (SAM 3.1, C++ with TensorRT, the segment_objects service) and parallel-gripper grasps (GraspGenX, the compute_grasps service).</description>
   <maintainer email="gupta.adyansh@gmail.com">Adyansh Gupta</maintainer>
   <license>BSD-3-Clause</license>
   <!-- The SAM 3 graphs' licence; the tokenizer vocabulary is OpenAI CLIP's (resources/CLIP_LICENSE). -->
@@ -25,11 +25,14 @@
   <depend>rclcpp_components</depend>
   <depend>sensor_msgs</depend>
   <depend>zlib</depend>
+  <!-- cppzmq's header (cppzmq-dev) comes from the Dockerfile with libzmq. -->
+  <depend>libzmq3-dev</depend>
 
   <exec_depend>launch</exec_depend>
   <exec_depend>launch_ros</exec_depend>
 
   <test_depend>ament_cmake_gtest</test_depend>
+  <test_depend>ament_cmake_pytest</test_depend>
 
   <export>
     <build_type>ament_cmake</build_type>

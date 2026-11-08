@@ -1,0 +1,57 @@
+# Parameters of graspgenx/graspgenx_server.py, a ZMQ server in the GraspGenX venv (not a ROS node,
+# so no ros__parameters). Every parameter is required.
+graspgenx_server:
+  # Where the server listens. No authentication: keep it on localhost, or a trusted network when
+  # the server runs on another machine. Must equal grasp_generation.yaml server_endpoint (checked
+  # by graspgenx/test/test_server.py).
+  endpoint: "tcp://127.0.0.1:5561"
+  # Holds gen/ and dis/ of GraspGenX's release checkpoints (mounted at /models in the container).
+  checkpoint_dir: /models/graspgenx
+  # The Piper's gripper in GraspGenX's gripper frame (+Z the approach from gripper_base, +X the
+  # closing direction, which is gripper_base's y): GraspGenX's own description of it (piper_hand's
+  # config.json in Hugging Face adithyamurali/gripper_descriptions), the box the inner finger
+  # faces sweep fully open (65 mm) and half open (33 mm), 20 mm wide, along the fingers from
+  # gripper_base z 77.5 to 132.5 mm. Metres. Write each list's numbers alike (0.0, not 0).
+  extents_open_m: [0.065, 0.02, 0.055]
+  offset_open_m: [0.0, 0.0, 0.105]
+  extents_mid_m: [0.033, 0.02, 0.055]
+  offset_mid_m: [0.0, 0.0, 0.105]
+  # Finger thickness along the closing axis at the pads (AgileX meshes), metres: points out to the
+  # fingers' outer faces count towards the opening a grasp needs.
+  finger_thickness_m: 0.008
+  # gripper_base to the fingertip point along the approach, metres (piper_hand's "fingertip"):
+  # GraspGenX places its control points and GraspMoE's top-down grasps by it.
+  fingertip_depth_m: 0.13
+  # gripper_base to the tcp link, metres: the replies pose the TCP. Must equal piper_description's
+  # tcp_joint z (checked by graspgenx/test/test_server.py).
+  tcp_depth_m: 0.1295
+  # 0: parallel two-finger.
+  gripper_type: 0
+  # graspmoe: the diffusion samples and top-down grasps over the object's bounding box, all scored
+  # by the discriminator (GraspGenX's default); diffusion: the samples alone.
+  planner: graspmoe
+  # Fingertip heights of GraspMoE's top-down grasps below the object's top, centimetres: 0 puts
+  # nothing between the fingers, and below -4 a 5 cm cube's grasps reach the table.
+  moe_z_offsets_cm: [-4.0, -3.0, -2.0, -1.0]
+  # Diffusion samples per request when a request asks for 0.
+  num_grasps: 200
+  # Grasps scored below this are dropped, 0 to 1. 0 keeps them all: the skills rank them by
+  # reachability as well.
+  min_confidence: 0.0
+  # Best grasps returned, and the most a request may ask for: the diffusion samples and GraspMoE's
+  # top-down grasps (36 yaws per height) all fit.
+  max_grasps: 600
+  # Clouds with fewer finite points are refused.
+  min_points: 50
+  # The model sees at most this many of a cloud's points, picked at random: GraspGenX's outlier
+  # removal builds a points x points distance matrix (8000: 0.26 GB). The openings use them all.
+  max_points: 8000
+  # The model (about 0.7 GB of GPU memory) is freed after this long without a request, seconds; 0
+  # keeps it loaded. A reload and its first run cost about 20 s on the next request.
+  idle_unload_s: 0.0
+  # How often the idle time is checked, seconds.
+  idle_check_s: 5.0
+  # Load the model at start and run it once, instead of on the first request.
+  preload: true
+  # After a failed load, requests fail at once for this long before the next try, seconds.
+  load_retry_s: 30.0

@@ -1,0 +1,8 @@
+/**/grasp_generation:
+  ros__parameters:
+    # The GraspGenX server (graspgenx/graspgenx_server.py). Must equal graspgenx_server.yaml
+    # endpoint (checked by graspgenx/test/test_server.py).
+    server_endpoint: "tcp://127.0.0.1:5561"
+    # Longest wait for a reply, seconds: a warm server answers in about 1 s; one still loading its
+    # model (about 20 s after start) answers when it is done.
+    timeout_s: 60.0
