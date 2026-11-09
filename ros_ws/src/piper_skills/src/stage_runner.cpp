@@ -330,8 +330,14 @@ std::expected<double, std::string> StageRunner::check(const Stage & stage) const
     const double period_rad = 2.0 * std::numbers::pi / stage.symmetry;
     const double yaw_rad = std::remainder(std::atan2(x_in_goal.y(), x_in_goal.x()), period_rad);
     const bool turns = stage.motion != StageMotion::kInsert;
-    if (error_m > settings_.goal_tolerance_m || tilt_rad > settings_.goal_tolerance_rad
-        || (turns && std::abs(yaw_rad) > settings_.goal_tolerance_rad))
+    const double tolerance_m =
+        stage.goal_tolerance_m > 0.0 ? stage.goal_tolerance_m : settings_.goal_tolerance_m;
+    const double tolerance_rad =
+        stage.goal_tolerance_rad > 0.0 ? stage.goal_tolerance_rad : settings_.goal_tolerance_rad;
+    // A part with no symmetry about its axis (a plug) must end turned right even when inserted.
+    const bool aligned = stage.symmetry == 1 || turns;
+    if (error_m > tolerance_m || tilt_rad > tolerance_rad
+        || (aligned && std::abs(yaw_rad) > tolerance_rad))
     {
         return std::unexpected(
             std::format(

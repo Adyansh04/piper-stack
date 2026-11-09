@@ -151,6 +151,8 @@ stages:
     approach_axis: [0, 0, -1]
     release_m: 0.0
     motion: insert
+    # Seated means within half a millimetre and 5 degrees: a plug turned or short is not in.
+    goal_tolerance: {position_m: 0.0005, angle_deg: 5}
     contacts: [[plug, socket], [plug, board]]
 
 # Images of the assets (sim/preview.py): the arm's joints (radians, metres for the fingers) and

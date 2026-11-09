@@ -140,6 +140,12 @@ Stage parseStage(const YAML::Node & node, const YAML::Node & scene, const std::s
             throw std::invalid_argument(std::format("{}.twist_deg must not be 0", where));
         }
     }
+    if (const auto tolerance = node["goal_tolerance"])
+    {
+        stage.goal_tolerance_m = positive(tolerance, "position_m", where + ".goal_tolerance");
+        stage.goal_tolerance_rad =
+            positive(tolerance, "angle_deg", where + ".goal_tolerance") * kDegToRad;
+    }
     for (const auto & pair : node["contacts"])
     {
         const auto names = pair.as<std::vector<std::string>>();

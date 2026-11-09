@@ -55,6 +55,9 @@ struct Stage
     double turns{0.0};
     /// Twist: the turn about the goal's z; negative is clockwise seen from above.
     double twist_rad{0.0};
+    /// How far from its goal the part may end, metres and radians; 0: the runner's defaults.
+    double goal_tolerance_m{0.0};
+    double goal_tolerance_rad{0.0};
     /// Pairs of parts and robot links the stage lets touch.
     std::vector<std::pair<std::string, std::string>> contacts;
 };
