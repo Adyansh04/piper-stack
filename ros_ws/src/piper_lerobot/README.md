@@ -65,6 +65,12 @@ ros2 run piper_lerobot expert_episodes.py --stage ring --episodes 20 \
     --task "Put the ring on the post" --ros-args -p use_sim_time:=true
 ```
 
+With `--policy <checkpoint>/pretrained_model` (and the stack's `servo:=true`),
+`expert_episodes.py` evaluates a trained policy on the stage instead: each episode the policy runs
+through `lerobot-rollout` for `--rollout-s`, the stage's contacts allowed in MoveIt's scene, and it
+counts as a success when the part ends within 3 mm of its goal on its mate (the simulator's ground
+truth).
+
 A LeRobot policy drives the arm through `piper_ros` without `passive`: its joint targets go
 through Servo, so a target the arm cannot reach without a collision or past a joint limit stops
 it there. `piper_lerobot.py rollout` and `piper_lerobot.py train` hand over to LeRobot's own
