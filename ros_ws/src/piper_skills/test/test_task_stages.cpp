@@ -135,13 +135,16 @@ TEST(TaskStages, AnInsertMayGoItsLastMillimetresGuided)
     const std::string ring =
         "  - {name: ring, part: ring, grasp: {opening_m: 0.02}, approach_m: 0.03, release_m: 0.0";
     const std::string guide =
-        ", guide: {from_m: 0.008, step_m: 0.001, push_m: 0.0005, spiral_m: 0.0008, tries: 12}}";
+        ", guide: {from_m: 0.008, step_m: 0.001, push_m: 0.0005, align_m: 0.0001, align_deg: 0.5, "
+        "spiral_m: 0.0008, tries: 12}}";
     const Stage stage = parseStages(withStage(ring + ", motion: insert" + guide))[0];
     EXPECT_TRUE(stage.guide.has_value());
     const InsertGuide read = stage.guide.value_or(InsertGuide{});
     EXPECT_NEAR(read.from_m, 0.008, 1e-12);
     EXPECT_NEAR(read.step_m, 0.001, 1e-12);
     EXPECT_NEAR(read.push_m, 0.0005, 1e-12);
+    EXPECT_NEAR(read.align_m, 0.0001, 1e-12);
+    EXPECT_NEAR(read.align_rad, 0.5 * std::numbers::pi / 180.0, 1e-12);
     EXPECT_NEAR(read.spiral_m, 0.0008, 1e-12);
     EXPECT_EQ(read.tries, 12);
     EXPECT_FALSE(parseStages(withStage(ring + ", motion: insert}"))[0].guide.has_value());
@@ -175,7 +178,13 @@ TEST(TaskStages, ASearchSpiralsOutAcrossTheApproachAxis)
     Stage plug;
     plug.approach_axis = -Eigen::Vector3d::UnitZ();
     const InsertGuide guide{
-        .from_m = 0.008, .step_m = 0.001, .push_m = 0.0005, .spiral_m = 0.0008, .tries = 12};
+        .from_m = 0.008,
+        .step_m = 0.001,
+        .push_m = 0.0005,
+        .align_m = 0.0001,
+        .align_rad = 0.01,
+        .spiral_m = 0.0008,
+        .tries = 12};
     for (int attempt = 1; attempt <= guide.tries; ++attempt)
     {
         const Eigen::Vector3d off = searchOffset(plug, guide, attempt);

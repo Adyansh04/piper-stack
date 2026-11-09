@@ -21,8 +21,10 @@ materials:
     static_friction: 0.6
     dynamic_friction: 0.5
     restitution: 0.0
-    contact_stiffness: 1.0e5
-    contact_damping: 0.0
+    # As the PLA parts: at 1e5 N/m the plug, held behind its centre of mass, drooped 14 degrees in
+    # the fingers once lifted (9 Nov); Newton's MuJoCo contacts here take no torsional friction.
+    contact_stiffness: 1.0e7
+    contact_damping: 1.0e4
     torsional_friction_m: 0.0
     rolling_friction_m: 0.0
   steel:
@@ -151,10 +153,13 @@ stages:
     approach_axis: [0, 0, -1]
     release_m: 0.0
     motion: insert
-    # From 8 mm out (the shell is 6.6 mm long) the plug goes in 1 mm a move from where it is seen,
-    # centred and turned onto the socket's axis and pressed 0.5 mm further; a move that gains no
-    # depth backs off and comes in again at points of a spiral up to 0.8 mm off the axis.
-    guide: {from_m: 0.008, step_m: 0.001, push_m: 0.0005, spiral_m: 0.0008, tries: 12}
+    # 8 mm out (the shell is 6.6 mm long), out of contact, the plug is centred on the socket's axis
+    # to 0.3 mm (the chamfer takes it from there; MoveIt's scene sees it to 0.1 mm) and 0.5 degrees
+    # from where it is seen; it then goes in 1 mm a move, pressed 0.5 mm further. A move that gains
+    # no depth backs out, aligns again and comes in at points of a spiral up to 0.8 mm off the axis.
+    guide:
+      {from_m: 0.008, step_m: 0.001, push_m: 0.0005, align_m: 0.0003, align_deg: 0.5,
+       spiral_m: 0.0008, tries: 12}
     # Seated means within half a millimetre and 5 degrees: a plug turned or short is not in.
     goal_tolerance: {position_m: 0.0005, angle_deg: 5}
     contacts: [[plug, socket], [plug, board]]

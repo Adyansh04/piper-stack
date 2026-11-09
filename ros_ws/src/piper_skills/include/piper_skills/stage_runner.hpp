@@ -255,12 +255,40 @@ private:
     // The part as the scene now has it, upright on its seat's axis: its height and turn there.
     [[nodiscard]] std::expected<Eigen::Isometry3d, std::string> onSeat(
         const Stage & stage, const Eigen::Isometry3d & seat) const;
+    // The part as the scene now has it, once settled, in a frame.
+    [[nodiscard]] std::expected<Eigen::Isometry3d, std::string> seen(
+        const Stage & stage, const Eigen::Isometry3d & frame) const;
+    // How a guided insert aims: the TCP's pose on the part, and the offset across the axis, in
+    // the goal's frame, that the arm's moves are given to land the part where it is meant to be.
+    struct Aim
+    {
+        Eigen::Isometry3d held;
+        Eigen::Vector3d correction{Eigen::Vector3d::Zero()};
+    };
+    // Aligns a guided insert's part out of contact (on `off`), adding each miss to the aim.
+    [[nodiscard]] std::expected<Aim, std::string> alignGuided(
+        ArmMotion & motion,
+        const Stage & stage,
+        const InsertGuide & guide,
+        const Eigen::Isometry3d & goal,
+        const Eigen::Vector3d & off,
+        Aim aim) const;
+    // Moves the held part to `left_m` from its goal along the axis and `off` across it, turned
+    // onto the goal of its symmetry nearest how it sits.
+    [[nodiscard]] Status moveGuided(
+        ArmMotion & motion,
+        const Stage & stage,
+        const Eigen::Isometry3d & goal,
+        const Eigen::Isometry3d & in_goal,
+        double left_m,
+        const Eigen::Vector3d & off,
+        const Eigen::Isometry3d & held) const;
     [[nodiscard]] Status guided(
         ArmMotion & motion,
         const Stage & stage,
         const InsertGuide & guide,
         const Eigen::Isometry3d & mate,
-        const Eigen::Isometry3d & held,
+        const Eigen::Isometry3d & lifted,
         const Cancelled & cancelled) const;
     [[nodiscard]] Status close(ArmMotion & motion) const;
     [[nodiscard]] Status allow(const Pairs & pairs, bool allowed) const;

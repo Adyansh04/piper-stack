@@ -46,8 +46,8 @@ gripper controller's `ParallelGripperCommand` action.
 so planning and MoveIt Servo know where the fixture and every part are. Each part with collision
 shapes becomes a collision object of its meshes. Its pose comes from `/sim/objects`
 (`tf2_msgs/TFMessage`, child frame = the part's name, in `world`): Isaac Sim's ground truth, or a
-publisher of the fixture's calibrated pose on the real arm. A part that moves more than 0.2 mm
-or 0.005 rad is moved in the scene within `update_period_s` (0.1 s).
+publisher of the fixture's calibrated pose on the real arm. A part that moves more than 0.1 mm
+or 0.002 rad is moved in the scene within `update_period_s` (0.1 s).
 
 ```bash
 ros2 launch piper_skills task_scene.launch.py task_file:=/piper-stack/tasks/assembly/task.yaml \
@@ -82,9 +82,10 @@ in the scene) and looks where it sits in the fingers: let go of in the scene for
 grasp, above its mate and down in a straight line (Pilz LIN at `task.insert_velocity_scale`),
 then:
 
-- `insert`: lets go where the goal is. With a `guide` (`tasks/README.md`) the last millimetres
-  go in moves from where the scene sees the part, centred and turned onto the goal and pressed a
-  little further, searching round the axis on a spiral where a move gains no depth.
+- `insert`: lets go where the goal is. With a `guide` (`tasks/README.md`) the part is first
+  aligned out of contact from where the scene sees it, then goes its last millimetres in moves
+  pressed a little further; where a move gains no depth it backs out, aligns again and comes in at
+  the next point of a spiral round the axis.
 - `screw`: turns the part `task.screw_step_deg` a move from where the scene sees it, pressed
   `task.screw_preload_m` below the height its thread gives it, so the thread sets how far it goes
   down, until it is within `task.screw_seated_m` of its seat. When `joint6` comes within

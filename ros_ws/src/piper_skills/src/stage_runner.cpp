@@ -31,6 +31,20 @@ namespace
 constexpr double kMinTurnRad = 0.1;
 // How far along a screw the TCP is probed to learn which way the wrist turns, radians.
 constexpr double kProbeTurnRad = 0.2;
+// The most moves a guided insert makes to align its part out of contact; each one starts from the
+// part as seen and the grasp as held, so a few close in on it.
+constexpr int kAlignMoves = 4;
+
+/// The goal's turn of a part's symmetry nearest how the part sits in the goal's frame.
+Eigen::Isometry3d goalTurn(const Stage & stage, const Eigen::Isometry3d & in_goal)
+{
+    Eigen::Isometry3d turn = Eigen::Isometry3d::Identity();
+    if (stage.symmetry == 2 && in_goal.linear()(0, 0) < 0.0)
+    {
+        turn.rotate(Eigen::AngleAxisd(std::numbers::pi, Eigen::Vector3d::UnitZ()));
+    }
+    return turn;
+}
 
 /// A part's pose backed off from its mate along the stage's approach axis.
 Eigen::Isometry3d backedOff(const Stage & stage, const Eigen::Isometry3d & pose, double distance_m)
@@ -609,24 +623,16 @@ std::expected<Eigen::Isometry3d, std::string> StageRunner::regrasp(
 std::expected<Eigen::Isometry3d, std::string> StageRunner::onSeat(
     const Stage & stage, const Eigen::Isometry3d & seat) const
 {
-    std::this_thread::sleep_for(settings_.scene_settle);
-    const auto poses = scene_->objectPoses({stage.part});
-    if (!poses)
-    {
-        return std::unexpected(poses.error());
-    }
-    if (!poses->contains(stage.part))
-    {
-        return std::unexpected(std::format("MoveIt's scene has no {} in the world", stage.part));
-    }
-    const Eigen::Isometry3d in_seat = seat.inverse() * poses->at(stage.part);
-    // Its tilt and its offset from the axis are left out: the next move rights and centres it.
-    Eigen::Isometry3d upright = Eigen::Isometry3d::Identity();
-    upright.translate(Eigen::Vector3d(0.0, 0.0, in_seat.translation().z()));
-    upright.rotate(
-        Eigen::AngleAxisd(
-            std::atan2(in_seat.linear()(1, 0), in_seat.linear()(0, 0)), Eigen::Vector3d::UnitZ()));
-    return upright;
+    return seen(stage, seat).transform([](const Eigen::Isometry3d & in_seat) {
+        // Its tilt and its offset from the axis are left out: the next move rights and centres it.
+        Eigen::Isometry3d upright = Eigen::Isometry3d::Identity();
+        upright.translate(Eigen::Vector3d(0.0, 0.0, in_seat.translation().z()));
+        upright.rotate(
+            Eigen::AngleAxisd(
+                std::atan2(in_seat.linear()(1, 0), in_seat.linear()(0, 0)),
+                Eigen::Vector3d::UnitZ()));
+        return upright;
+    });
 }
 
 StageRunner::Status StageRunner::guided(
@@ -634,76 +640,144 @@ StageRunner::Status StageRunner::guided(
     const Stage & stage,
     const InsertGuide & guide,
     const Eigen::Isometry3d & mate,
-    const Eigen::Isometry3d & held,
+    const Eigen::Isometry3d & lifted,
     const Cancelled & cancelled) const
 {
     const double tolerance_m =
         stage.goal_tolerance_m > 0.0 ? stage.goal_tolerance_m : settings_.goal_tolerance_m;
     const Eigen::Isometry3d goal = mate * partOnMate(stage, 0.0);
-    // The part `left_m` from its goal along the approach axis and `off` across it, centred and
-    // turned as the goal of its symmetry nearest how it sits now.
-    const auto move_to =
-        [&](const Eigen::Isometry3d & in_goal, double left_m, const Eigen::Vector3d & off) {
-            Eigen::Isometry3d target = goal;
-            target.translate((left_m * stage.approach_axis) + off);
-            if (stage.symmetry == 2 && in_goal.linear()(0, 0) < 0.0)
-            {
-                target.rotate(Eigen::AngleAxisd(std::numbers::pi, Eigen::Vector3d::UnitZ()));
-            }
-            return motion.linear(target * held, settings_.insert_velocity_scale);
-        };
+    auto aim =
+        alignGuided(motion, stage, guide, goal, Eigen::Vector3d::Zero(), Aim{.held = lifted});
+    if (!aim)
+    {
+        return std::unexpected(aim.error());
+    }
     double before_m = std::numeric_limits<double>::infinity();
     int tries = 0;
     Eigen::Vector3d off = Eigen::Vector3d::Zero();
-    const int moves =
-        static_cast<int>(std::ceil(guide.from_m / guide.step_m)) + (2 * guide.tries) + 2;
+    const int per_try = static_cast<int>(std::ceil(guide.from_m / guide.step_m)) + 2;
+    const int moves = ((guide.tries + 1) * per_try) + 2;
     for (int move = 0; move < moves; ++move)
     {
         if (cancelled())
         {
             return std::unexpected("cancelled");
         }
-        std::this_thread::sleep_for(settings_.scene_settle);
-        const auto poses = scene_->objectPoses({stage.part});
-        if (!poses || !poses->contains(stage.part))
+        const auto in_goal = seen(stage, goal);
+        if (!in_goal)
         {
-            return std::unexpected(
-                std::format("MoveIt's scene has no {} in the world", stage.part));
+            return std::unexpected(in_goal.error());
         }
-        const Eigen::Isometry3d in_goal = goal.inverse() * poses->at(stage.part);
-        const double left_m = in_goal.translation().dot(stage.approach_axis);
+        const double left_m = in_goal->translation().dot(stage.approach_axis);
         if (left_m <= tolerance_m)
         {
             return {};
         }
-        Status moved;
-        if (before_m - left_m < guide.step_m / 2.0)
+        if (before_m - left_m >= guide.step_m / 2.0)
         {
-            if (++tries > guide.tries)
+            const double to_m = std::max(0.0, left_m - guide.step_m) - guide.push_m;
+            // A move that cannot be planned counts as one that gained nothing: the next look
+            // backs out and tries again.
+            if (auto moved = moveGuided(
+                    motion, stage, goal, *in_goal, to_m, off + aim->correction, aim->held);
+                !moved)
             {
-                return std::unexpected(
-                    std::format(
-                        "{} stuck {:.1f} mm short of its goal after {} tries",
-                        stage.part,
-                        1000.0 * left_m,
-                        guide.tries));
+                RCLCPP_WARN(logger_, "A guided move failed: %s", moved.error().c_str());
             }
-            // Back off a step and come in again at the next point of a spiral round the axis.
-            off = searchOffset(stage, guide, tries);
-            moved = move_to(in_goal, left_m + guide.step_m, off);
-            before_m = std::numeric_limits<double>::infinity();
-        }
-        else
-        {
-            moved = move_to(in_goal, std::max(0.0, left_m - guide.step_m) - guide.push_m, off);
             before_m = left_m;
+            continue;
         }
-        if (!moved)
+        if (++tries > guide.tries)
         {
-            return moved;
+            return std::unexpected(
+                std::format(
+                    "{} stuck {:.1f} mm short of its goal after {} tries",
+                    stage.part,
+                    1000.0 * left_m,
+                    guide.tries));
         }
+        // Back out to the start, align again and come in at the next point of a spiral.
+        off = searchOffset(stage, guide, tries);
+        aim = moveGuided(
+                  motion, stage, goal, *in_goal, guide.from_m, off + aim->correction, aim->held)
+                  .and_then([&] { return alignGuided(motion, stage, guide, goal, off, *aim); });
+        if (!aim)
+        {
+            return std::unexpected(aim.error());
+        }
+        before_m = std::numeric_limits<double>::infinity();
     }
     return std::unexpected(std::format("{} did not reach its goal in {} moves", stage.part, moves));
+}
+
+std::expected<StageRunner::Aim, std::string> StageRunner::alignGuided(
+    ArmMotion & motion,
+    const Stage & stage,
+    const InsertGuide & guide,
+    const Eigen::Isometry3d & goal,
+    const Eigen::Vector3d & off,
+    Aim aim) const
+{
+    const Eigen::Vector3d & axis = stage.approach_axis;
+    for (int move = 0; move <= kAlignMoves; ++move)
+    {
+        const auto in_goal = seen(stage, goal);
+        if (!in_goal)
+        {
+            return std::unexpected(in_goal.error());
+        }
+        const Eigen::Vector3d across =
+            in_goal->translation() - (in_goal->translation().dot(axis) * axis) - off;
+        const double angle_rad =
+            Eigen::AngleAxisd(goalTurn(stage, *in_goal).linear().transpose() * in_goal->linear())
+                .angle();
+        if (across.norm() <= guide.align_m && angle_rad <= guide.align_rad)
+        {
+            return aim;
+        }
+        if (move == kAlignMoves)
+        {
+            break;
+        }
+        // The arm stops a little short of where it is sent, the same way each time near here:
+        // the misses add up into the aim.
+        aim.correction -= across;
+        if (auto moved = moveGuided(
+                motion, stage, goal, *in_goal, guide.from_m, off + aim.correction, aim.held);
+            !moved)
+        {
+            RCLCPP_WARN(logger_, "An aligning move failed: %s", moved.error().c_str());
+            return aim;
+        }
+    }
+    RCLCPP_WARN(logger_, "The %s is not aligned after %d moves", stage.part.c_str(), kAlignMoves);
+    return aim;
+}
+
+StageRunner::Status StageRunner::moveGuided(
+    ArmMotion & motion,
+    const Stage & stage,
+    const Eigen::Isometry3d & goal,
+    const Eigen::Isometry3d & in_goal,
+    double left_m,
+    const Eigen::Vector3d & off,
+    const Eigen::Isometry3d & held) const
+{
+    Eigen::Isometry3d target = goal;
+    target.translate((left_m * stage.approach_axis) + off);
+    return motion.linear(target * goalTurn(stage, in_goal) * held, settings_.insert_velocity_scale);
+}
+
+std::expected<Eigen::Isometry3d, std::string> StageRunner::seen(
+    const Stage & stage, const Eigen::Isometry3d & frame) const
+{
+    std::this_thread::sleep_for(settings_.scene_settle);
+    const auto poses = scene_->objectPoses({stage.part});
+    if (!poses || !poses->contains(stage.part))
+    {
+        return std::unexpected(std::format("MoveIt's scene has no {} in the world", stage.part));
+    }
+    return frame.inverse() * poses->at(stage.part);
 }
 
 StageRunner::Status StageRunner::close(ArmMotion & motion) const

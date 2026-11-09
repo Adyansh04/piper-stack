@@ -25,10 +25,12 @@ enum class StageMotion : std::uint8_t
 
 /**
  * @brief How an insert goes the last of the way in moves from where the part is seen.
- * @details Each move starts from the part's measured pose: centred and turned onto the goal's
- * axis, it goes `step_m` deeper and is pressed `push_m` further. A move that gains less than half
- * a step backs off a step and comes in again at the next point of a spiral round the axis, up to
- * `spiral_m` off it; after `tries` of those the stage fails. Metres.
+ * @details At `from_m` from its goal, out of contact, the part is centred and turned onto the
+ * goal's axis from where it is seen, the grasp taken as the fingers hold it then, until it is
+ * within `align_m` and `align_rad`. Each move then goes `step_m` deeper and presses `push_m`
+ * further. A move that gains less than half a step backs out to `from_m`, aligns again and comes
+ * in at the next point of a spiral round the axis, up to `spiral_m` off it; after `tries` of those
+ * the stage fails. Metres and radians.
  */
 struct InsertGuide
 {
@@ -36,6 +38,8 @@ struct InsertGuide
     double from_m{0.0};
     double step_m{0.0};
     double push_m{0.0};
+    double align_m{0.0};
+    double align_rad{0.0};
     double spiral_m{0.0};
     int tries{0};
 };

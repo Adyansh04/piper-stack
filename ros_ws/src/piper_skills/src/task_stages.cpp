@@ -153,6 +153,8 @@ Stage parseStage(const YAML::Node & node, const YAML::Node & scene, const std::s
             .from_m = positive(guide, "from_m", at),
             .step_m = positive(guide, "step_m", at),
             .push_m = positive(guide, "push_m", at),
+            .align_m = positive(guide, "align_m", at),
+            .align_rad = positive(guide, "align_deg", at) * kDegToRad,
             .spiral_m = positive(guide, "spiral_m", at),
             .tries = static_cast<int>(positive(guide, "tries", at)),
         };

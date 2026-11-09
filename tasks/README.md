@@ -44,7 +44,7 @@ Each stage names its `part` (whose goal is `in` another part, its mate) and give
 | `release_m` | How far above its path the part moves and is let go. |
 | `approach_axis` | The way, in the part's frame, it comes onto its mate from and backs off along (default `[0, 0, 1]`; a plug whose z points into its socket comes from `[0, 0, -1]`). |
 | `motion` | `insert`, `screw` (with `screw: {pitch_m, turns}`, a right-hand thread from `turns` above the seat) or `twist` (with `twist_deg`, negative clockwise seen from above). |
-| `guide` | For an `insert`: `{from_m, step_m, push_m, spiral_m, tries}`. From `from_m` out the part goes in `step_m` a move from where it is seen, centred and turned onto the goal and pressed `push_m` further; a move that gains less than half a step backs off and comes in again at the next point of a spiral up to `spiral_m` off the axis, `tries` times at most. Without it the part goes straight to its goal. |
+| `guide` | For an `insert`: `{from_m, step_m, push_m, align_m, align_deg, spiral_m, tries}`. At `from_m` out, out of contact, the part is centred and turned onto the goal from where it is seen until it is within `align_m` and `align_deg`; it then goes in `step_m` a move, pressed `push_m` further. A move that gains less than half a step backs out to `from_m`, aligns again and comes in at the next point of a spiral up to `spiral_m` off the axis, `tries` times at most. Without it the part goes straight to its goal. |
 | `goal_tolerance` | `{position_m, angle_deg}`: how far from its goal the part may end (default: the skills' `task.goal_tolerance_*`). |
 | `contacts` | Pairs of parts or robot links that may touch while the stage runs. |
 
