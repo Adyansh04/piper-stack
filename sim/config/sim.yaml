@@ -111,14 +111,10 @@ newton:
   sdf_resolution: 256
   sdf_band_m: 0.002
   contact_gap_m: 0.002
-  # Their pads' material: Newton's default contact is soft enough that a light part sinks
-  # millimetres into a squeezing pad (a 6 mm plug read under 0.6 mm); stiff as the printed parts,
-  # and grippy as the real pads. Friction to be measured at the lab.
-  finger_material:
-    static_friction: 0.8
-    dynamic_friction: 0.6
-    contact_stiffness: 1.0e7
-    contact_damping: 1.0e4
+  # Their pads' material, or null for Newton's default. The default contact is soft (a light part
+  # sinks 1-3 mm into a squeezing pad), and that give lets a held ring centre itself on its post:
+  # stiff pads (1e7 N/m) jammed it 4 mm above its seat (9 Nov). To fit to the real pads.
+  finger_material: null
 
 # The overhead RGB camera: a standard USB camera on a stand above the work area. Its optical frame
 # is in the robot description (piper.urdf.xacro's overhead_camera args: 1 m above the table,

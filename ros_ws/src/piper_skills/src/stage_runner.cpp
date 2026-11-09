@@ -506,8 +506,10 @@ StageRunner::Status StageRunner::close(ArmMotion & motion) const
         return std::unexpected(
             std::format("the fingers closed on nothing ({:.1f} mm apart)", 2000.0 * *finger));
     }
+    // At most half its width further in: a thin part (a plug) is not squeezed to nothing.
     const auto squeezed = motion.gripper(
-        std::max(settings_.closed_m, *finger - settings_.squeeze_m), settings_.effort);
+        std::max(settings_.closed_m, *finger - std::min(settings_.squeeze_m, *finger / 2.0)),
+        settings_.effort);
     if (!squeezed)
     {
         return std::unexpected(squeezed.error());
