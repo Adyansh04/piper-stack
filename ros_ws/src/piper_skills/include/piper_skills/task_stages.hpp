@@ -42,10 +42,13 @@ struct Stage
     double opening_m{0.0};
     /// 1, or 2 when the grasp also holds the part turned half a turn about its z.
     int symmetry{1};
-    /// How far above where its motion starts the part comes down from, along the goal's z.
+    /// How far from where its motion starts the part comes in from, along the approach axis.
     double approach_m{0.0};
-    /// How far above the motion's path the part moves and is let go, along the goal's z.
+    /// How far above the motion's path the part moves and is let go, along the approach axis.
     double release_m{0.0};
+    /// The way, in the part's frame, it comes onto its mate from and backs off along: a unit vector,
+    /// +z unless the stage says otherwise (a plug whose z points into its socket comes from -z).
+    Eigen::Vector3d approach_axis{Eigen::Vector3d::UnitZ()};
     StageMotion motion{StageMotion::kInsert};
     /// Screw: the thread's pitch, and the turns from where the screw starts to the seat.
     double pitch_m{0.0};
@@ -75,7 +78,7 @@ struct Stage
 /**
  * @brief Where the part is on its mate with part of its motion still to go.
  * @details The motion turns the part about the goal's z and, for a screw, lowers it one pitch per
- * turn; the path is raised by `release_m` throughout.
+ * turn; the path is moved by `release_m` along the approach axis throughout.
  * @param[in] stage The stage.
  * @param[in] left The share of the motion still to go: 1 where it starts, 0 at its end.
  * @return The part's pose in the mate's frame.

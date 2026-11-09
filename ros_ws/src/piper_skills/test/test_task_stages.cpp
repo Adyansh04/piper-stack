@@ -107,6 +107,25 @@ TEST(TaskStages, TwistStartsTurnedBackAtTheGoalRaisedByTheRelease)
     EXPECT_NEAR(partOnMate(cap, 0.0).translation().z(), 0.0085, 1e-12);
 }
 
+TEST(TaskStages, AStageComesInAlongItsApproachAxis)
+{
+    const std::string plug =
+        "scene:\n  goal:\n    plug: {in: socket, xyz: [0, 0, -0.0066], rpy: [180, 0, 0]}\n"
+        "stages:\n  - {name: plug, part: plug, grasp: {opening_m: 0.012}, approach_m: 0.02,\n"
+        "     approach_axis: [0, 0, -2], release_m: 0.001, motion: insert}\n";
+    const Stage stage = parseStages(plug)[0];
+    EXPECT_TRUE(stage.approach_axis.isApprox(-Eigen::Vector3d::UnitZ(), 1e-12));
+    // Let go 1 mm back along -z of the plug, which points into the socket: out of it.
+    const Eigen::Isometry3d released = partOnMate(stage, 0.0);
+    EXPECT_NEAR(released.translation().z(), -0.0066 + 0.001, 1e-12);
+    EXPECT_THROW(
+        (void)parseStages(
+            "scene:\n  goal:\n    ring: {in: base}\nstages:\n  - {name: ring, part: ring, "
+            "grasp: {opening_m: 0.02}, approach_m: 0.03, release_m: 0.0, motion: insert, "
+            "approach_axis: [0, 0, 0]}\n"),
+        std::invalid_argument);
+}
+
 TEST(TaskStages, RefusesBadStages)
 {
     const std::string ring =

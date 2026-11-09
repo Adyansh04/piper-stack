@@ -92,6 +92,8 @@ std::unordered_map<std::string, std::vector<shape_msgs::msg::Mesh>> loadParts(
             meshes.push_back(boost::get<shape_msgs::msg::Mesh>(message));
         }
     }
+    // A part only seen (no collision shape) is no obstacle: MoveIt refuses an empty object.
+    std::erase_if(parts, [](const auto & part) { return part.second.empty(); });
     return parts;
 }
 

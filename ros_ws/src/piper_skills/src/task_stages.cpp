@@ -111,6 +111,16 @@ Stage parseStage(const YAML::Node & node, const YAML::Node & scene, const std::s
     }
     stage.approach_m = positive(node, "approach_m", where);
     stage.release_m = require(node, "release_m", where).as<double>();
+    if (node["approach_axis"])
+    {
+        const auto axis = node["approach_axis"].as<std::vector<double>>();
+        if (axis.size() != 3 || Eigen::Vector3d(axis[0], axis[1], axis[2]).norm() < 1e-9)
+        {
+            throw std::invalid_argument(
+                std::format("{}.approach_axis is a 3-vector, not 0", where));
+        }
+        stage.approach_axis = Eigen::Vector3d(axis[0], axis[1], axis[2]).normalized();
+    }
     if (stage.release_m < 0.0)
     {
         throw std::invalid_argument(std::format("{}.release_m must not be negative", where));
@@ -199,7 +209,8 @@ Eigen::Isometry3d partOnMate(const Stage & stage, double left)
 {
     const double lift_m = stage.motion == StageMotion::kScrew ? stage.pitch_m * stage.turns : 0.0;
     Eigen::Isometry3d out = stage.goal;
-    out.translate(Eigen::Vector3d(0.0, 0.0, stage.release_m + left * lift_m));
+    out.translate(
+        (stage.release_m * stage.approach_axis) + Eigen::Vector3d(0.0, 0.0, left * lift_m));
     out.rotate(Eigen::AngleAxisd(-left * stageTurn(stage), Eigen::Vector3d::UnitZ()));
     return out;
 }

@@ -31,11 +31,11 @@ constexpr double kMinTurnRad = 0.1;
 // How far along a screw the TCP is probed to learn which way the wrist turns, radians.
 constexpr double kProbeTurnRad = 0.2;
 
-/// A pose moved along its own z.
-Eigen::Isometry3d raised(const Eigen::Isometry3d & pose, double distance_m)
+/// A part's pose backed off from its mate along the stage's approach axis.
+Eigen::Isometry3d backedOff(const Stage & stage, const Eigen::Isometry3d & pose, double distance_m)
 {
     Eigen::Isometry3d out = pose;
-    out.translate(Eigen::Vector3d(0.0, 0.0, distance_m));
+    out.translate(distance_m * stage.approach_axis);
     return out;
 }
 
@@ -261,7 +261,7 @@ StageRunner::Status StageRunner::place(
 {
     phase("approaching");
     const Eigen::Isometry3d start = mate * partOnMate(stage, grasp.start_left);
-    const auto above = motion.ik(raised(start, stage.approach_m) * grasp.in_part);
+    const auto above = motion.ik(backedOff(stage, start, stage.approach_m) * grasp.in_part);
     if (!above)
     {
         return std::unexpected(std::format("above {}'s mate: {}", stage.part, above.error()));
@@ -373,7 +373,7 @@ std::expected<StageRunner::Grasp, std::string> StageRunner::chooseGrasp(
         for (const double start : starts)
         {
             const Eigen::Isometry3d above =
-                raised(mate * partOnMate(stage, start), stage.approach_m);
+                backedOff(stage, mate * partOnMate(stage, start), stage.approach_m);
             if (auto over = motion.ik(above * grasp); !over)
             {
                 why = std::format("above its mate: {}", over.error());
