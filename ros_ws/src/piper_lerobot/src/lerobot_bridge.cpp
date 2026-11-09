@@ -82,8 +82,8 @@ public:
               "arm_joints",
               std::vector<std::string>{"joint1", "joint2", "joint3", "joint4", "joint5", "joint6"}))
         , gripper_joint_(declare_parameter("gripper_joint", std::string("joint7")))
-        , gain_(declare_parameter("jog_gain", 2.0))
-        , max_velocity_rad_s_(declare_parameter("max_jog_velocity", 0.5))
+        , gain_(declare_parameter("jog_gain", 10.0))
+        , max_velocity_rad_s_(declare_parameter("max_jog_velocity", 1.0))
         , target_timeout_s_(declare_parameter("target_timeout_s", 0.5))
         , gripper_deadband_m_(declare_parameter("gripper_deadband_m", 0.002))
         , gripper_effort_nm_(declare_parameter("gripper_effort_nm", 1.0))

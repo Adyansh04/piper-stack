@@ -20,9 +20,10 @@ lerobot_bridge:
     gripper_action: "/gripper_controller/gripper_cmd"
     # Joint jogs a second; Servo publishes at 100 Hz.
     jog_rate_hz: 100.0
-    # A joint's jog velocity is the gain (1/s) times its distance to the target, capped (rad/s).
-    jog_gain: 2.0
-    max_jog_velocity: 0.5
+    # A joint's jog velocity is the gain (1/s) times its distance to the target, capped (rad/s):
+    # 10/s tracks a policy's targets 0.1 s behind, as close as the recorded trajectories ran.
+    jog_gain: 10.0
+    max_jog_velocity: 1.0
     # The arm stops when no action has come for this long, in s (Servo then ramps it down).
     target_timeout_s: 0.5
     # Gripper targets closer than this to the last goal send none, in m; its grip effort, N m.

@@ -66,15 +66,17 @@ ros2 run piper_lerobot expert_episodes.py --stage ring --episodes 20 \
 ```
 
 With `--policy <checkpoint>/pretrained_model` (and the stack's `servo:=true`),
-`expert_episodes.py` evaluates a trained policy on the stage instead: each episode the policy runs
-through `lerobot-rollout` for `--rollout-s`, the stage's contacts allowed in MoveIt's scene, and it
-counts as a success when the part ends within 3 mm of its goal on its mate (the simulator's ground
-truth).
+`expert_episodes.py` evaluates a trained policy on the stage instead: each episode
+`lerobot/run_policy.py` runs the policy for `--rollout-s`, the stage's contacts allowed in
+MoveIt's scene, and the episode counts as a success when the part ends within 3 mm of its goal on
+its mate (the simulator's ground truth). `run_policy.py` gives the policy the robot's whole
+observation, efforts included, where `lerobot-rollout` keeps only a robot's `.pos` and `.vel`
+state.
 
 A LeRobot policy drives the arm through `piper_ros` without `passive`: its joint targets go
 through Servo, so a target the arm cannot reach without a collision or past a joint limit stops
-it there. `piper_lerobot.py rollout` and `piper_lerobot.py train` hand over to LeRobot's own
-`lerobot-rollout` and `lerobot-train`; neither has run on this robot yet (no policy is trained).
+it there. `piper_lerobot.py train` hands over to LeRobot's `lerobot-train`, and
+`piper_lerobot.py rollout` to `lerobot-rollout`, for a policy that observes no efforts.
 
 ## The bridge
 
@@ -89,7 +91,7 @@ it there. `piper_lerobot.py rollout` and `piper_lerobot.py train` hand over to L
 
 The ZMQ protocol (`include/piper_lerobot/bridge_protocol.hpp`) is request-reply on
 `tcp://127.0.0.1:5590`: `observe`, `act` with the seven targets, `release`. A joint's jog velocity
-is `jog_gain` (2 /s) times its distance to the target, capped at `max_jog_velocity` (0.5 rad/s);
+is `jog_gain` (10 /s) times its distance to the target, capped at `max_jog_velocity` (1 rad/s);
 when no target has come for `target_timeout_s` (0.5 s) the bridge stops jogging and Servo ramps
 the arm down. Parameters: `config/lerobot_bridge.yaml`.
 

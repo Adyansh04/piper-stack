@@ -12,10 +12,11 @@ scene, the skills with the task and the bridge:
     ros2 run piper_lerobot expert_episodes.py --stage ring --episodes 50 \\
         --task "Put the ring on the post" --ros-args -p use_sim_time:=true
 
-With --policy, a trained LeRobot policy runs each episode instead of the skills (lerobot-rollout
+With --policy, a trained LeRobot policy runs each episode instead of the skills (run_policy.py
 with the piper_ros robot, through the bridge and MoveIt Servo, which needs servo:=true): the
 stage's contacts are allowed in MoveIt's scene for its duration, and an episode succeeds when the
-part ends at its goal on its mate (the simulator's ground truth).
+part ends at its goal on its mate (the simulator's ground truth). The gripper then opens, the arm
+goes back to ready and the parts to their start.
 
 Python: it sequences ROS services and actions a few times a minute (data generation).
 """
@@ -34,6 +35,7 @@ from pathlib import Path
 import numpy as np
 import rclpy
 import yaml
+from control_msgs.action import ParallelGripperCommand
 from piper_msgs.action import MoveArmToNamedPose, RunStage
 from piper_msgs.srv import AllowContacts
 from rcl_interfaces.msg import Parameter, ParameterType, ParameterValue
@@ -41,6 +43,7 @@ from rcl_interfaces.srv import SetParameters
 from rclpy.action import ActionClient
 from rclpy.node import Node
 from rclpy.qos import DurabilityPolicy, QoSProfile, ReliabilityPolicy
+from sensor_msgs.msg import JointState
 from std_msgs.msg import String
 from std_srvs.srv import Trigger
 from tf2_msgs.msg import TFMessage
@@ -48,8 +51,12 @@ from tf2_msgs.msg import TFMessage
 #: The links a policy's gripper touches parts and their supports with, and what it comes near.
 GRIPPER_LINKS = ('gripper_base', 'link6', 'link7', 'link8')
 #: LeRobot's command line with the Piper's plugins, in LeRobot's own environment.
-LEROBOT = ('/opt/lerobot-venv/bin/python', 'piper_lerobot.py')
+LEROBOT_PYTHON = '/opt/lerobot-venv/bin/python'
 LEROBOT_DIR = Path('/piper-stack/ros_ws/src/piper_lerobot/lerobot')
+#: The gripper's action, its finger joint, and that finger's travel fully open in m (skills.yaml).
+GRIPPER_ACTION = '/gripper_controller/gripper_cmd'
+GRIPPER_JOINT = 'joint7'
+GRIPPER_OPEN_M = 0.035
 
 #: The marker is latched: a recorder that starts late still reads the current one.
 QOS_MARKER = QoSProfile(
@@ -73,6 +80,7 @@ class Expert:
         self.set_parameters = node.create_client(SetParameters, '/piper_sim/set_parameters')
         self.stage = ActionClient(node, RunStage, '/run_stage')
         self.pose = ActionClient(node, MoveArmToNamedPose, '/move_arm_to_named_pose')
+        self.gripper = ActionClient(node, ParallelGripperCommand, GRIPPER_ACTION)
         self.allow = node.create_client(AllowContacts, '/task_scene/allow_contacts')
         self.poses: dict[str, np.ndarray] = {}
         node.create_subscription(TFMessage, '/sim/objects', self.on_poses, 10)
@@ -190,39 +198,63 @@ def run_policy(expert: Expert, args: argparse.Namespace, spec: dict) -> tuple[bo
     expert.allow_contacts(pairs, True)
     try:
         command = [
-            *LEROBOT,
-            'rollout',
-            '--strategy.type=base',
-            f'--policy.path={args.policy}',
-            '--robot.type=piper_ros',
-            f'--robot.images={args.images}',
-            f'--robot.effort={str(args.effort).lower()}',
+            LEROBOT_PYTHON,
+            'run_policy.py',
+            f'--policy={args.policy}',
+            f'--images={args.images}',
+            *(['--effort'] if args.effort else []),
             f'--task={args.task}',
-            f'--duration={args.rollout_s}',
-            '--fps=15',
+            f'--duration-s={args.rollout_s}',
         ]
         env = {**os.environ, 'HF_HUB_OFFLINE': '1', 'PYTHONPATH': str(LEROBOT_DIR)}
-        subprocess.run(
-            command,
-            cwd=LEROBOT_DIR,
-            env=env,
-            timeout=args.rollout_s + 120,
-            check=False,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
+        with open('/tmp/rollout.log', 'w') as log:
+            done = subprocess.run(
+                command,
+                cwd=LEROBOT_DIR,
+                env=env,
+                timeout=args.rollout_s + 120,
+                check=False,
+                stdout=log,
+                stderr=subprocess.STDOUT,
+            )
+        if done.returncode != 0:
+            tail = Path('/tmp/rollout.log').read_text().strip().splitlines()[-3:]
+            expert.node.get_logger().warning(f'The rollout failed ({done.returncode}): {tail}')
+        deadline = time.monotonic() + 2.0
+        while time.monotonic() < deadline:
+            rclpy.spin_once(expert.node, timeout_sec=0.1)
+        verdict = judge(expert, part, mate, pose_matrix(goal))
+        # The policy leaves the arm where it stopped, perhaps on a part: it lets go and backs off
+        # with the stage's contacts still allowed, or the next start pose cannot be planned.
+        expert.run(
+            expert.gripper,
+            ParallelGripperCommand.Goal(
+                command=JointState(name=[GRIPPER_JOINT], position=[GRIPPER_OPEN_M])
+            ),
+            30.0,
         )
+        expert.run(expert.pose, MoveArmToNamedPose.Goal(name='ready'), 120.0)
+        # A part can stay caught on a finger: the parts go back to their start, away from the arm.
+        expert.reset_before(args.stage)
     finally:
         expert.allow_contacts(pairs, False)
-    deadline = time.monotonic() + 2.0
-    while time.monotonic() < deadline:
-        rclpy.spin_once(expert.node, timeout_sec=0.1)
+    return verdict
+
+
+def judge(expert: Expert, part: str, mate: str, goal: np.ndarray) -> tuple[bool, str]:
+    """Return whether the part is at its goal on its mate (3 mm, 20 degrees), and how far off."""
     if part not in expert.poses or mate not in expert.poses:
         return False, 'no ground truth'
-    want = expert.poses[mate] @ pose_matrix(goal)
+    want = expert.poses[mate] @ goal
     have = expert.poses[part]
-    error_m = float(np.linalg.norm(have[:3, 3] - want[:3, 3]))
+    off_m = (np.linalg.inv(want) @ have)[:3, 3]
+    error_m = float(np.linalg.norm(off_m))
     tilt = math.degrees(math.acos(float(np.clip(want[:3, 2] @ have[:3, 2], -1.0, 1.0))))
-    return error_m < 0.003 and tilt < 20.0, f'{1e3 * error_m:.1f} mm, tilt {tilt:.0f} deg'
+    dx, dy, dz = 1e3 * off_m
+    return (
+        error_m < 0.003 and tilt < 20.0,
+        f'{1e3 * error_m:.1f} mm (goal frame {dx:+.1f} {dy:+.1f} {dz:+.1f}), tilt {tilt:.0f} deg',
+    )
 
 
 def main() -> int:
