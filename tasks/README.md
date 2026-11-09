@@ -79,4 +79,4 @@ cap upside down).
 | `fixture` | Holds every loose part in a pocket at a known pose; the base sits in it and takes the threading torque. |
 | `base` | M29x3.5 boss (thread on the lower 9 mm, 25.4 mm pilot above), keyed post with one flat. |
 | `ring`, `collar`, `pin`, `cap` | Ring: D bore on the post. Collar: M30x3.5 inside, two bayonet slots outside. Pin: 8 mm in an 8.6 mm hole. Cap: two lugs in the collar's slots. |
-| `board`, `socket`, `plug_holder`, `cable_anchor` | The USB-C demo board, its socket (a USB Type-C receptacle's opening, 8.34 by 2.56 mm), the plug's holder and the cable's anchor. |
+| `board`, `socket`, `plug_holder`, `plug_cradle`, `cable_anchor` | The USB-C demo board, its socket (a USB Type-C receptacle's opening, 8.34 by 2.56 mm), the cable's holder, a 4 mm rib that holds the plug level between the fingers, and the cable's anchor. |

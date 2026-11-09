@@ -65,6 +65,13 @@ parts:
     material: pla
     shapes:
       - {mesh: cad/plug_holder.stl, collision: sdf, sdf_resolution: 256, colour: [0.95, 0.55, 0.1]}
+  # A rib under the plug's body, narrower than the closed fingers: it holds the plug level until
+  # the fingers take it.
+  plug_cradle:
+    body: static
+    material: pla
+    shapes:
+      - {mesh: cad/plug_cradle.stl, collision: sdf, sdf_resolution: 128, colour: [0.95, 0.55, 0.1]}
   cable_anchor:
     body: static
     material: pla
@@ -82,7 +89,8 @@ parts:
         colour: [0.75, 0.75, 0.77]
         metallic: 1.0
         roughness: 0.3
-      - {mesh: cad/plug_body.stl, collision: convex_hull, colour: [0.05, 0.05, 0.06]}
+      # SDF too: under Newton the fingers (SDF) would pass through a convex hull.
+      - {mesh: cad/plug_body.stl, collision: sdf, sdf_resolution: 256, colour: [0.05, 0.05, 0.06]}
 
 # The cable: a chain of capsules from the plug's back to the anchor, straight at rest; each joint
 # bends and twists against a spring of the cable's stiffness over a segment. Stiffness and damping
@@ -122,12 +130,28 @@ scene:
     socket: {in: board, xyz: [0.0, -0.015, 0.036], rpy: [90, -90, 0]}
     plug_holder: {xyz: [0.3, -0.06, 0.0]}
     cable_anchor: {in: plug_holder, xyz: [0.08, -0.02, 0.0]}
-  # The plug in its holder, pointing at the socket.
+    plug_cradle: {in: plug_holder, xyz: [0.0, 0.032, 0.0]}
+  # The plug on its cradle, pointing at the socket, 40 mm of it clear of the holder: the fingers,
+  # 25 mm wide where they hold and wider higher up, close on its body clear of both the holder
+  # and the board.
   start:
-    plug: {in: plug_holder, xyz: [0.0, 0.04065, 0.036], rpy: [-90, -90, 0]}
+    plug: {in: plug_cradle, xyz: [0.0, 0.016, 0.036], rpy: [-90, -90, 0]}
   # Seated: the tip at the bottom of the receptacle.
   goal:
     plug: {in: socket, xyz: [0.0, 0.0, -0.0066], rpy: [180, 0, 0]}
+
+# The plug's z points into the socket: it comes onto its mate along -z (approach_axis). The grasp
+# holds the body's rear across its 6 mm thickness, the gripper pointing down: the fingers' front
+# stays 5 mm or more off the board with the plug in, their back off the holder.
+stages:
+  - name: plug
+    part: plug
+    grasp: {xyz: [0.0, 0.0, -0.0245], rpy: [0, -90, 0], opening_m: 0.012}
+    approach_m: 0.02
+    approach_axis: [0, 0, -1]
+    release_m: 0.0
+    motion: insert
+    contacts: [[plug, socket], [plug, board]]
 
 # Images of the assets (sim/preview.py): the arm's joints (radians, metres for the fingers) and
 # the views, eye and target in the world frame.
