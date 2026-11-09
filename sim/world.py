@@ -178,13 +178,26 @@ class TaskReset:
         node: The simulator's node.
         spec: The task (sim/task.py), as the simulator placed it.
         bodies: Each moving part's name and the prim path of its rigid body.
+        fixed_starts: Other bodies a reset puts back where they start, whatever the state: each
+            prim path and its world pose (a cable's segments).
         timeout_s: How long the service waits for the loop, in wall seconds.
     """
 
-    def __init__(self, node: Node, spec, bodies: dict[str, str], timeout_s: float = 5.0) -> None:
+    def __init__(
+        self,
+        node: Node,
+        spec,
+        bodies: dict[str, str],
+        fixed_starts: dict[str, np.ndarray] | None = None,
+        timeout_s: float = 5.0,
+    ) -> None:
         self.spec = spec
         self.names = list(bodies)
-        self.paths = [bodies[name] for name in self.names]
+        self.paths = [bodies[name] for name in self.names] + list(fixed_starts or {})
+        # As the physics views take them: x, y, z, qx, qy, qz, qw.
+        self.fixed_starts = np.array(
+            [_pose_xyzw(T) for T in (fixed_starts or {}).values()]
+        ).reshape(-1, 7)
         self.timeout_s = timeout_s
         #: Guards ``pending``, set by the service (rclpy thread) and taken by the loop.
         self.lock = threading.Lock()
@@ -208,7 +221,9 @@ class TaskReset:
             return response
         self.applied.clear()
         with self.lock:
-            self.pending = np.array([_pose_xyzw(poses[name]) for name in self.names])
+            self.pending = np.vstack(
+                (np.array([_pose_xyzw(poses[name]) for name in self.names]), self.fixed_starts)
+            )
         response.success = self.applied.wait(self.timeout_s)
         response.message = (
             f'Parts set {"before " + stage if stage else "at the start"}'

@@ -364,9 +364,17 @@ def run(app, cfg: dict, stop: threading.Event) -> None:
             bodies = task_usd.body_paths(spec, task_usd.add(stage, spec, files))
             objects += list(bodies.items())
             log.info(f'Task {task}: {len(spec.parts)} parts, {len(bodies)} moving')
-            # A cable's segments would stay where they were: only cable-free tasks reset.
-            if spec.cable is None:
-                reset = world.TaskReset(node, spec, bodies)
+            # A reset lays a cable back along its start path too, segment by segment.
+            segments = {}
+            if spec.cable is not None:
+                cable_prim = bodies[spec.cable.plug].rsplit('/', 1)[0]
+                for i, (centre, rotation) in enumerate(
+                    zip(spec.cable.centres, spec.cable.rotations, strict=True)
+                ):
+                    T = np.eye(4)
+                    T[:3, :3], T[:3, 3] = rotation, centre
+                    segments[f'{cable_prim}/{task_usd.segment_name(i)}'] = T
+            reset = world.TaskReset(node, spec, bodies, segments)
         usd, urdf = robot.import_robot(
             Path(r['urdf']), Path(r['usd_cache']), r['packages'], r['drives']
         )
