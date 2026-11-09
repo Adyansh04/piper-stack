@@ -107,6 +107,8 @@ def main() -> None:
             ],
         }
     )
+    # RTX real-time denoises with DLSS; quality mode renders at two thirds of a camera's resolution.
+    app.set_setting('/rtx/post/dlss/execMode', int(cfg['app']['dlss_exec_mode']))
     exit_code = 0
     try:
         import isaacsim.core.experimental.utils.app as app_utils

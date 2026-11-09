@@ -26,6 +26,9 @@ app:
   physics_hz: 200
   # Frames rendered a second; physics_hz must be a multiple of it.
   render_hz: 25
+  # DLSS's mode for RTX real-time, which denoises with it: 0 performance, 1 balanced, 2 quality,
+  # 3 auto. Performance renders the 640 x 480 wrist camera at 320 x 240 and upscales it.
+  dlss_exec_mode: 2
   # true: frames are paced to wall time. false: as fast as the GPU renders.
   real_time: true
   # With real_time: simulation seconds per wall second (0.5 tests a stack on a slow simulator).
