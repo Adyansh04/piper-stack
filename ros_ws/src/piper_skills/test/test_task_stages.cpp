@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include <cmath>
 #include <numbers>
 #include <stdexcept>
 #include <string>
@@ -127,6 +128,61 @@ TEST(TaskStages, AStageComesInAlongItsApproachAxis)
             "grasp: {opening_m: 0.02}, approach_m: 0.03, release_m: 0.0, motion: insert, "
             "approach_axis: [0, 0, 0]}\n"),
         std::invalid_argument);
+}
+
+TEST(TaskStages, AnInsertMayGoItsLastMillimetresGuided)
+{
+    const std::string ring =
+        "  - {name: ring, part: ring, grasp: {opening_m: 0.02}, approach_m: 0.03, release_m: 0.0";
+    const std::string guide =
+        ", guide: {from_m: 0.008, step_m: 0.001, push_m: 0.0005, spiral_m: 0.0008, tries: 12}}";
+    const Stage stage = parseStages(withStage(ring + ", motion: insert" + guide))[0];
+    EXPECT_TRUE(stage.guide.has_value());
+    const InsertGuide read = stage.guide.value_or(InsertGuide{});
+    EXPECT_NEAR(read.from_m, 0.008, 1e-12);
+    EXPECT_NEAR(read.step_m, 0.001, 1e-12);
+    EXPECT_NEAR(read.push_m, 0.0005, 1e-12);
+    EXPECT_NEAR(read.spiral_m, 0.0008, 1e-12);
+    EXPECT_EQ(read.tries, 12);
+    EXPECT_FALSE(parseStages(withStage(ring + ", motion: insert}"))[0].guide.has_value());
+    EXPECT_THROW(
+        (void)parseStages(withStage(ring + ", motion: twist, twist_deg: 30" + guide)),
+        std::invalid_argument);
+    EXPECT_THROW(
+        (void)parseStages(withStage(ring + ", motion: insert, guide: {from_m: 0.008}}")),
+        std::invalid_argument);
+}
+
+TEST(TaskStages, AScrewStepTurnsDownTheThreadPressedOntoIt)
+{
+    const Stage collar = parseStages(kTask)[1];
+    Eigen::Isometry3d on_seat = Eigen::Isometry3d::Identity();
+    on_seat.translate(Eigen::Vector3d(0.0, 0.0, 0.004));
+    const double quarter = std::numbers::pi / 2.0;
+    const Eigen::Isometry3d next = screwStep(collar, on_seat, quarter, 0.0005);
+    // A quarter turn lowers it a quarter pitch (3.5 mm), pressed 0.5 mm further.
+    EXPECT_NEAR(next.translation().z(), 0.004 - 0.000875 - 0.0005, 1e-12);
+    // Clockwise seen from above, the way a right-hand thread goes in.
+    EXPECT_NEAR(std::atan2(next.linear()(1, 0), next.linear()(0, 0)), -quarter, 1e-12);
+    // Seated, it is pressed no further than the preload below its seat.
+    const Eigen::Isometry3d seated =
+        screwStep(collar, Eigen::Isometry3d::Identity(), quarter, 0.0005);
+    EXPECT_NEAR(seated.translation().z(), -0.0005, 1e-12);
+}
+
+TEST(TaskStages, ASearchSpiralsOutAcrossTheApproachAxis)
+{
+    Stage plug;
+    plug.approach_axis = -Eigen::Vector3d::UnitZ();
+    const InsertGuide guide{
+        .from_m = 0.008, .step_m = 0.001, .push_m = 0.0005, .spiral_m = 0.0008, .tries = 12};
+    for (int attempt = 1; attempt <= guide.tries; ++attempt)
+    {
+        const Eigen::Vector3d off = searchOffset(plug, guide, attempt);
+        EXPECT_NEAR(off.dot(plug.approach_axis), 0.0, 1e-15);
+        EXPECT_NEAR(off.norm(), 0.0008 * std::sqrt(attempt / 12.0), 1e-12);
+    }
+    EXPECT_GT((searchOffset(plug, guide, 1) - searchOffset(plug, guide, 2)).norm(), 1e-4);
 }
 
 TEST(TaskStages, RefusesBadStages)

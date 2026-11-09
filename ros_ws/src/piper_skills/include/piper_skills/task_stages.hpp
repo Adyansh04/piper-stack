@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -20,6 +21,23 @@ enum class StageMotion : std::uint8_t
     kScrew,
     /// Inserted turned back by the twist, then turned by it about the goal's z.
     kTwist,
+};
+
+/**
+ * @brief How an insert goes the last of the way in moves from where the part is seen.
+ * @details Each move starts from the part's measured pose: centred and turned onto the goal's
+ * axis, it goes `step_m` deeper and is pressed `push_m` further. A move that gains less than half
+ * a step backs off a step and comes in again at the next point of a spiral round the axis, up to
+ * `spiral_m` off it; after `tries` of those the stage fails. Metres.
+ */
+struct InsertGuide
+{
+    /// How far from its goal, along the approach axis, the part is when the moves start.
+    double from_m{0.0};
+    double step_m{0.0};
+    double push_m{0.0};
+    double spiral_m{0.0};
+    int tries{0};
 };
 
 /**
@@ -55,6 +73,8 @@ struct Stage
     double turns{0.0};
     /// Twist: the turn about the goal's z; negative is clockwise seen from above.
     double twist_rad{0.0};
+    /// Insert: the moves of its last part; unset, it goes straight to the goal.
+    std::optional<InsertGuide> guide;
     /// How far from its goal the part may end, metres and radians; 0: the runner's defaults.
     double goal_tolerance_m{0.0};
     double goal_tolerance_rad{0.0};
@@ -87,6 +107,32 @@ struct Stage
  * @return The part's pose in the mate's frame.
  */
 [[nodiscard]] Eigen::Isometry3d partOnMate(const Stage & stage, double left);
+
+/**
+ * @brief Where a screw puts its part next, from where it stands on its seat.
+ * @details The part turns `step_rad` down the thread (clockwise seen from above) and is pressed
+ * `preload_m` below the height the thread gives it after the turn, but not below its seat by more
+ * than that: the thread, not the arm, sets how far it goes down.
+ * @param[in] stage A screw stage.
+ * @param[in] on_seat The part upright on its seat's axis: its height above the seat and its turn.
+ * @param[in] step_rad The turn, radians.
+ * @param[in] preload_m How far below the thread's height the part is pressed, metres.
+ * @return The part's pose in its seat's frame.
+ */
+[[nodiscard]] Eigen::Isometry3d screwStep(
+    const Stage & stage, const Eigen::Isometry3d & on_seat, double step_rad, double preload_m);
+
+/**
+ * @brief Where a guided insert comes in again on a try after it stuck.
+ * @details The points of a spiral round the approach axis, a golden angle apart, out to
+ * `guide.spiral_m` at the last try.
+ * @param[in] stage An insert stage with a guide.
+ * @param[in] guide The stage's guide.
+ * @param[in] attempt The try, 1 to `guide.tries`.
+ * @return The offset across the approach axis, in the goal's frame, metres.
+ */
+[[nodiscard]] Eigen::Vector3d searchOffset(
+    const Stage & stage, const InsertGuide & guide, int attempt);
 
 /**
  * @brief The grasps that hold a stage's part: the grasp, turned by each step of its symmetry.

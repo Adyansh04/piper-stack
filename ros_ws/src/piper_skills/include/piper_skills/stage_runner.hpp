@@ -68,7 +68,7 @@ struct StageSettings
     double turn_velocity_scale{0.6};
 
     /**
-     * @brief The largest turn of one straight move, radians.
+     * @brief The largest turn of one straight move of a twist, radians.
      */
     double max_turn_step_rad{1.5708};
 
@@ -78,6 +78,21 @@ struct StageSettings
      */
     std::string wrist_joint{"joint6"};
     double wrist_margin_rad{0.15};
+
+    /**
+     * @brief How long MoveIt's scene takes to show a part where it was last measured.
+     */
+    std::chrono::milliseconds scene_settle{300};
+
+    /**
+     * @brief How a screw follows its thread: the turn of each move, radians; how far below the
+     * height its thread gives it the part is pressed, and how near its seat it counts as seated,
+     * metres; and how many turns beyond its thread's it may take to find the thread's start.
+     */
+    double screw_step_rad{0.785};
+    double screw_preload_m{0.0005};
+    double screw_seated_m{0.0005};
+    double screw_search_turns{1.5};
 
     /**
      * @brief How long a released part settles before its pose is checked, and how far from its
@@ -98,10 +113,15 @@ struct StageSettings
  * @brief Runs the stages of a task (`task.yaml`) with the arm, through MoveIt.
  * @details A stage takes its part where MoveIt's scene has it (task_scene keeps the parts' poses
  * there), grasps it with the grasp of its symmetry that the arm reaches at the part and above its
- * mate (a screw may start up to a turn higher up its thread for that), lifts it and brings it down
- * onto its mate in a straight line. A screw then turns the part
- * down its thread in straight moves of at most `max_turn_step_rad`, letting go and turning the
- * wrist back half a turn whenever the wrist nears its limit; a twist turns it in place. The
+ * mate (a screw may start up to a turn higher up its thread for that) and lifts it. It then looks
+ * where the part sits in the fingers (in the scene, let go of for a moment) and brings it, not
+ * the grasp, above its mate and down onto it in a straight line. A screw then turns the part in straight moves of
+ * `screw_step_rad` from where MoveIt's scene sees it, pressed a little below the height its thread
+ * gives it, so the thread sets the descent, until it is seated; whenever the wrist nears its limit
+ * the fingers let go, the wrist turns back half a turn and the fingers take the part again at
+ * the grasp's height on it. A twist turns the part in place in moves of at most
+ * `max_turn_step_rad`. An insert with a guide (InsertGuide) goes its last millimetres in moves from
+ * where the scene sees the part, searching round the axis where it sticks. The
  * fingers let go, the arm rises and the part's pose is checked against its goal. The fingers may
  * touch the part, and the stage's contacts are allowed, only while the stage runs; the part and
  * the fingers may touch what the part rests on until it is lifted.
@@ -192,6 +212,9 @@ private:
         const Eigen::Isometry3d & mate,
         const Phase & phase,
         const Cancelled & cancelled) const;
+    // The grasp as the part now sits in the fingers, measured in the scene.
+    [[nodiscard]] std::expected<Grasp, std::string> inHand(
+        ArmMotion & motion, const Stage & stage, Grasp grasp) const;
     [[nodiscard]] Status place(
         ArmMotion & motion,
         const Stage & stage,
@@ -217,9 +240,27 @@ private:
         ArmMotion & motion,
         const Stage & stage,
         const Eigen::Isometry3d & mate,
-        Eigen::Isometry3d grasp,
+        const Eigen::Isometry3d & grasp,
         double from,
         const Phase & phase,
+        const Cancelled & cancelled) const;
+    // Lets go, turns the wrist back half a turn, takes the part again; returns the TCP's new pose
+    // on the part as onSeat gives it.
+    [[nodiscard]] std::expected<Eigen::Isometry3d, std::string> regrasp(
+        ArmMotion & motion,
+        const Stage & stage,
+        const Eigen::Isometry3d & seat,
+        const JointValues & joints,
+        double wrist_sign) const;
+    // The part as the scene now has it, upright on its seat's axis: its height and turn there.
+    [[nodiscard]] std::expected<Eigen::Isometry3d, std::string> onSeat(
+        const Stage & stage, const Eigen::Isometry3d & seat) const;
+    [[nodiscard]] Status guided(
+        ArmMotion & motion,
+        const Stage & stage,
+        const InsertGuide & guide,
+        const Eigen::Isometry3d & mate,
+        const Eigen::Isometry3d & held,
         const Cancelled & cancelled) const;
     [[nodiscard]] Status close(ArmMotion & motion) const;
     [[nodiscard]] Status allow(const Pairs & pairs, bool allowed) const;

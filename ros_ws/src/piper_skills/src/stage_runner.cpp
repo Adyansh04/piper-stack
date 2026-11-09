@@ -7,6 +7,7 @@
 #include <expected>
 #include <format>
 #include <future>
+#include <limits>
 #include <memory>
 #include <numbers>
 #include <string>
@@ -196,7 +197,8 @@ std::expected<double, std::string> StageRunner::run(
             .and_then([&] { return pick(motion, stage, part, mate, phase, cancelled); })
             .and_then([&](const Grasp & held) {
                 return allowed.remove(resting).transform([&] { return held; });
-            });
+            })
+            .and_then([&](Grasp held) { return inHand(motion, stage, std::move(held)); });
     if (!grasp)
     {
         return std::unexpected(grasp.error());
@@ -255,6 +257,37 @@ std::expected<StageRunner::Grasp, std::string> StageRunner::pick(
     return *grasp;
 }
 
+std::expected<StageRunner::Grasp, std::string> StageRunner::inHand(
+    ArmMotion & motion, const Stage & stage, Grasp grasp) const
+{
+    // Let go of in the scene, the part goes back to where it was last measured.
+    if (auto released = attach(stage.part, false); !released)
+    {
+        return std::unexpected(released.error());
+    }
+    std::this_thread::sleep_for(settings_.scene_settle);
+    const auto poses = scene_->objectPoses({stage.part});
+    if (auto held = attach(stage.part, true); !held)
+    {
+        return std::unexpected(held.error());
+    }
+    if (!poses || !poses->contains(stage.part))
+    {
+        return std::unexpected(
+            std::format("{} is not in MoveIt's scene to see in the fingers", stage.part));
+    }
+    const Eigen::Isometry3d in_part = poses->at(stage.part).inverse() * motion.tcpPose();
+    const Eigen::Isometry3d off = grasp.in_part.inverse() * in_part;
+    RCLCPP_INFO(
+        logger_,
+        "The %s sits %.1f mm and %.0f degrees off its grasp",
+        stage.part.c_str(),
+        1000.0 * off.translation().norm(),
+        Eigen::AngleAxisd(off.linear()).angle() * 180.0 / std::numbers::pi);
+    grasp.in_part = in_part;
+    return grasp;
+}
+
 StageRunner::Status StageRunner::place(
     ArmMotion & motion,
     const Stage & stage,
@@ -285,16 +318,27 @@ StageRunner::Status StageRunner::place(
                 phase("twisting");
                 return turn(motion, stage, mate, grasp.in_part, 1.0, 0.0);
             case StageMotion::kInsert:
+                if (stage.guide.has_value())
+                {
+                    const InsertGuide & guide = *stage.guide;
+                    // Seen in the scene from here, the part moves as part of the world.
+                    return attach(stage.part, false).and_then([&] {
+                        return guided(motion, stage, guide, mate, grasp.in_part, cancelled);
+                    });
+                }
                 break;
         }
         return {};
     };
+    // A guided insert comes straight in only to where its guided moves start.
+    const Eigen::Isometry3d in_to =
+        stage.guide ? backedOff(stage, start, stage.guide->from_m) : start;
     return motion.toJoints(*above)
         .and_then([&] { return allowed.add(stage.contacts); })
         .and_then([&] { return stopIf(cancelled); })
         .and_then([&] {
             phase("inserting");
-            return motion.linear(start * grasp.in_part, settings_.insert_velocity_scale);
+            return motion.linear(in_to * grasp.in_part, settings_.insert_velocity_scale);
         })
         .and_then(finish)
         .and_then([&] {
@@ -302,7 +346,8 @@ StageRunner::Status StageRunner::place(
             return motion.gripper(stage.opening_m, settings_.effort).transform([](double) {});
         })
         .and_then([&]() -> Status {
-            return stage.motion == StageMotion::kScrew ? Status() : attach(stage.part, false);
+            const bool detached = stage.motion == StageMotion::kScrew || stage.guide;
+            return detached ? Status() : attach(stage.part, false);
         })
         .and_then([&] {
             phase("retreating");
@@ -424,7 +469,7 @@ StageRunner::Status StageRunner::screw(
     ArmMotion & motion,
     const Stage & stage,
     const Eigen::Isometry3d & mate,
-    Eigen::Isometry3d grasp,
+    const Eigen::Isometry3d & grasp,
     double from,
     const Phase & phase,
     const Cancelled & cancelled) const
@@ -445,14 +490,45 @@ StageRunner::Status StageRunner::screw(
     {
         return std::unexpected("no wrist position to screw from");
     }
-    const double sign =
+    const double wrist_sign =
         ahead->at(settings_.wrist_joint) >= now->at(settings_.wrist_joint) ? 1.0 : -1.0;
-    double left = from;
-    while (left > 0.0)
+    const Eigen::Isometry3d seat = mate * stage.goal;
+    // The TCP on the part as the fingers hold it, so a part that sat in them off the grasp is
+    // not pulled back to it.
+    const auto start = onSeat(stage, seat);
+    if (!start)
+    {
+        return std::unexpected(start.error());
+    }
+    Eigen::Isometry3d held = (seat * *start).inverse() * motion.tcpPose();
+    const double budget_rad =
+        ((from * stage.turns) + settings_.screw_search_turns) * 2.0 * std::numbers::pi;
+    double turned_rad = 0.0;
+    phase("screwing");
+    while (true)
     {
         if (cancelled())
         {
             return std::unexpected("cancelled");
+        }
+        const auto on_seat = onSeat(stage, seat);
+        if (!on_seat)
+        {
+            return std::unexpected(on_seat.error());
+        }
+        const double height_m = on_seat->translation().z();
+        if (height_m <= settings_.screw_seated_m)
+        {
+            return {};
+        }
+        if (turned_rad >= budget_rad)
+        {
+            return std::unexpected(
+                std::format(
+                    "the thread did not take {}: {:.1f} mm above its seat after {:.1f} turns",
+                    stage.part,
+                    1000.0 * height_m,
+                    turned_rad / (2.0 * std::numbers::pi)));
         }
         const auto joints = motion.joints();
         if (!joints)
@@ -460,37 +536,174 @@ StageRunner::Status StageRunner::screw(
             return std::unexpected("no current joint positions");
         }
         const double wrist = joints->at(settings_.wrist_joint);
-        const double room_rad = sign > 0.0 ? high - wrist : wrist - low;
-        if (room_rad >= kMinTurnRad)
+        const double room_rad = wrist_sign > 0.0 ? high - wrist : wrist - low;
+        if (room_rad < kMinTurnRad)
         {
-            phase("screwing");
-            const double next = std::max(0.0, left - (room_rad / whole_rad));
-            if (auto turned = turn(motion, stage, mate, grasp, left, next); !turned)
+            phase("regrasping");
+            auto regrasped = regrasp(motion, stage, seat, *joints, wrist_sign);
+            if (!regrasped)
             {
-                return turned;
+                return std::unexpected(regrasped.error());
             }
-            left = next;
+            held = *regrasped;
+            phase("screwing");
             continue;
         }
-        phase("regrasping");
-        if (auto opened = motion.gripper(stage.opening_m, settings_.effort); !opened)
+        const double step_rad = std::min(settings_.screw_step_rad, room_rad);
+        const Eigen::Isometry3d target =
+            seat * screwStep(stage, *on_seat, step_rad, settings_.screw_preload_m) * held;
+        if (auto moved = motion.linear(target, settings_.turn_velocity_scale); !moved)
         {
-            return std::unexpected(opened.error());
+            return moved;
         }
-        JointValues back = *joints;
-        back[settings_.wrist_joint] -= sign * std::numbers::pi;
-        if (auto turned = motion.toJoints(back); !turned)
-        {
-            return turned;
-        }
-        if (auto closed = close(motion); !closed)
-        {
-            return closed;
-        }
-        // Half a turn back on a part with two-fold flats: the grasp turned by half a turn.
-        grasp = Eigen::AngleAxisd(std::numbers::pi, Eigen::Vector3d::UnitZ()) * grasp;
+        turned_rad += step_rad;
     }
-    return {};
+}
+
+std::expected<Eigen::Isometry3d, std::string> StageRunner::regrasp(
+    ArmMotion & motion,
+    const Stage & stage,
+    const Eigen::Isometry3d & seat,
+    const JointValues & joints,
+    double wrist_sign) const
+{
+    if (auto opened = motion.gripper(stage.opening_m, settings_.effort); !opened)
+    {
+        return std::unexpected(opened.error());
+    }
+    JointValues back = joints;
+    back[settings_.wrist_joint] -= wrist_sign * std::numbers::pi;
+    if (auto turned = motion.toJoints(back); !turned)
+    {
+        return std::unexpected(turned.error());
+    }
+    // The fingers go back to the grasp's height on the part however it moved in them, the grasp
+    // of its symmetry nearest the turned TCP.
+    const auto on_seat = onSeat(stage, seat);
+    if (!on_seat)
+    {
+        return std::unexpected(on_seat.error());
+    }
+    const Eigen::Isometry3d part = seat * *on_seat;
+    const Eigen::Isometry3d tcp = motion.tcpPose();
+    const auto grasps = stageGrasps(stage);
+    const auto nearest = std::ranges::min_element(grasps, {}, [&](const Eigen::Isometry3d & grasp) {
+        return Eigen::AngleAxisd((part * grasp).linear().transpose() * tcp.linear()).angle();
+    });
+    if (auto moved = motion.linear(part * *nearest, settings_.insert_velocity_scale); !moved)
+    {
+        return std::unexpected(moved.error());
+    }
+    if (auto closed = close(motion); !closed)
+    {
+        return std::unexpected(closed.error());
+    }
+    const auto taken = onSeat(stage, seat);
+    if (!taken)
+    {
+        return std::unexpected(taken.error());
+    }
+    return (seat * *taken).inverse() * motion.tcpPose();
+}
+
+std::expected<Eigen::Isometry3d, std::string> StageRunner::onSeat(
+    const Stage & stage, const Eigen::Isometry3d & seat) const
+{
+    std::this_thread::sleep_for(settings_.scene_settle);
+    const auto poses = scene_->objectPoses({stage.part});
+    if (!poses)
+    {
+        return std::unexpected(poses.error());
+    }
+    if (!poses->contains(stage.part))
+    {
+        return std::unexpected(std::format("MoveIt's scene has no {} in the world", stage.part));
+    }
+    const Eigen::Isometry3d in_seat = seat.inverse() * poses->at(stage.part);
+    // Its tilt and its offset from the axis are left out: the next move rights and centres it.
+    Eigen::Isometry3d upright = Eigen::Isometry3d::Identity();
+    upright.translate(Eigen::Vector3d(0.0, 0.0, in_seat.translation().z()));
+    upright.rotate(
+        Eigen::AngleAxisd(
+            std::atan2(in_seat.linear()(1, 0), in_seat.linear()(0, 0)), Eigen::Vector3d::UnitZ()));
+    return upright;
+}
+
+StageRunner::Status StageRunner::guided(
+    ArmMotion & motion,
+    const Stage & stage,
+    const InsertGuide & guide,
+    const Eigen::Isometry3d & mate,
+    const Eigen::Isometry3d & held,
+    const Cancelled & cancelled) const
+{
+    const double tolerance_m =
+        stage.goal_tolerance_m > 0.0 ? stage.goal_tolerance_m : settings_.goal_tolerance_m;
+    const Eigen::Isometry3d goal = mate * partOnMate(stage, 0.0);
+    // The part `left_m` from its goal along the approach axis and `off` across it, centred and
+    // turned as the goal of its symmetry nearest how it sits now.
+    const auto move_to =
+        [&](const Eigen::Isometry3d & in_goal, double left_m, const Eigen::Vector3d & off) {
+            Eigen::Isometry3d target = goal;
+            target.translate((left_m * stage.approach_axis) + off);
+            if (stage.symmetry == 2 && in_goal.linear()(0, 0) < 0.0)
+            {
+                target.rotate(Eigen::AngleAxisd(std::numbers::pi, Eigen::Vector3d::UnitZ()));
+            }
+            return motion.linear(target * held, settings_.insert_velocity_scale);
+        };
+    double before_m = std::numeric_limits<double>::infinity();
+    int tries = 0;
+    Eigen::Vector3d off = Eigen::Vector3d::Zero();
+    const int moves =
+        static_cast<int>(std::ceil(guide.from_m / guide.step_m)) + (2 * guide.tries) + 2;
+    for (int move = 0; move < moves; ++move)
+    {
+        if (cancelled())
+        {
+            return std::unexpected("cancelled");
+        }
+        std::this_thread::sleep_for(settings_.scene_settle);
+        const auto poses = scene_->objectPoses({stage.part});
+        if (!poses || !poses->contains(stage.part))
+        {
+            return std::unexpected(
+                std::format("MoveIt's scene has no {} in the world", stage.part));
+        }
+        const Eigen::Isometry3d in_goal = goal.inverse() * poses->at(stage.part);
+        const double left_m = in_goal.translation().dot(stage.approach_axis);
+        if (left_m <= tolerance_m)
+        {
+            return {};
+        }
+        Status moved;
+        if (before_m - left_m < guide.step_m / 2.0)
+        {
+            if (++tries > guide.tries)
+            {
+                return std::unexpected(
+                    std::format(
+                        "{} stuck {:.1f} mm short of its goal after {} tries",
+                        stage.part,
+                        1000.0 * left_m,
+                        guide.tries));
+            }
+            // Back off a step and come in again at the next point of a spiral round the axis.
+            off = searchOffset(stage, guide, tries);
+            moved = move_to(in_goal, left_m + guide.step_m, off);
+            before_m = std::numeric_limits<double>::infinity();
+        }
+        else
+        {
+            moved = move_to(in_goal, std::max(0.0, left_m - guide.step_m) - guide.push_m, off);
+            before_m = left_m;
+        }
+        if (!moved)
+        {
+            return moved;
+        }
+    }
+    return std::unexpected(std::format("{} did not reach its goal in {} moves", stage.part, moves));
 }
 
 StageRunner::Status StageRunner::close(ArmMotion & motion) const

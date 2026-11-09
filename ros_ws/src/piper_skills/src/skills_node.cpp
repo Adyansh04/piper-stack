@@ -371,6 +371,11 @@ private:
         t.max_turn_step_rad = degToRad(param<double>("task.max_turn_step_deg", 90.0));
         t.wrist_joint = param<std::string>("task.wrist_joint", "joint6");
         t.wrist_margin_rad = param<double>("task.wrist_margin_rad", 0.15);
+        t.scene_settle = msOf(param<double>("task.scene_settle_s", 0.3));
+        t.screw_step_rad = degToRad(param<double>("task.screw_step_deg", 45.0));
+        t.screw_preload_m = param<double>("task.screw_preload_m", 0.0005);
+        t.screw_seated_m = param<double>("task.screw_seated_m", 0.0005);
+        t.screw_search_turns = param<double>("task.screw_search_turns", 1.5);
         t.settle = msOf(param<double>("task.settle_s", 1.0));
         t.goal_tolerance_m = param<double>("task.goal_tolerance_m", 0.003);
         t.goal_tolerance_rad = degToRad(param<double>("task.goal_tolerance_deg", 20.0));

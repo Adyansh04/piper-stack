@@ -133,8 +133,8 @@ public:
         , frame_(declare_parameter("planning_frame", std::string("world")))
         , tcp_link_(declare_parameter("tcp_link", std::string("tcp")))
         , touch_links_(declare_parameter("touch_links", std::vector<std::string>{}))
-        , distance_m_(declare_parameter("position_tolerance_m", 0.001))
-        , angle_rad_(declare_parameter("angle_tolerance_rad", 0.01))
+        , distance_m_(declare_parameter("position_tolerance_m", 0.0002))
+        , angle_rad_(declare_parameter("angle_tolerance_rad", 0.005))
     {
         poses_sub_ = create_subscription<tf2_msgs::msg::TFMessage>(
             declare_parameter("poses_topic", std::string("/sim/objects")),
@@ -158,7 +158,7 @@ public:
                 onAllow(*request, *response);
             });
         timer_ = create_wall_timer(
-            std::chrono::duration<double>(declare_parameter("update_period_s", 0.5)),
+            std::chrono::duration<double>(declare_parameter("update_period_s", 0.1)),
             [this] { update(); });
         RCLCPP_INFO(get_logger(), "Task scene: %zu parts", parts_.size());
     }

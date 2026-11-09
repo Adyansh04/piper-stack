@@ -46,8 +46,8 @@ gripper controller's `ParallelGripperCommand` action.
 so planning and MoveIt Servo know where the fixture and every part are. Each part with collision
 shapes becomes a collision object of its meshes. Its pose comes from `/sim/objects`
 (`tf2_msgs/TFMessage`, child frame = the part's name, in `world`): Isaac Sim's ground truth, or a
-publisher of the fixture's calibrated pose on the real arm. A part that moves more than 1 mm or
-0.01 rad is moved in the scene within `update_period_s`.
+publisher of the fixture's calibrated pose on the real arm. A part that moves more than 0.2 mm
+or 0.005 rad is moved in the scene within `update_period_s` (0.1 s).
 
 ```bash
 ros2 launch piper_skills task_scene.launch.py task_file:=/piper-stack/tasks/assembly/task.yaml \
@@ -77,14 +77,22 @@ ros2 action send_goal --feedback /run_stage piper_msgs/action/RunStage "{stage: 
 
 A stage takes its part where MoveIt's scene has it and grasps it with the grasp (of the part's
 symmetry) that the arm reaches both there and above the part's mate. It lifts the part (attached
-in the scene), brings it above its mate and down in a straight line (Pilz LIN at
-`task.insert_velocity_scale`), then:
+in the scene) and looks where it sits in the fingers: let go of in the scene for
+`task.scene_settle_s`, the part shows where it was last measured. It then brings the part, not the
+grasp, above its mate and down in a straight line (Pilz LIN at `task.insert_velocity_scale`),
+then:
 
-- `insert`: lets go where the goal is.
-- `screw`: turns the part down its thread in straight moves of at most `task.max_turn_step_deg`;
-  when `joint6` comes within `task.wrist_margin_rad` of its limit the fingers let go, the wrist
-  turns back half a turn and the fingers close on the part's flats again.
-- `twist`: turns the part in place by the stage's twist.
+- `insert`: lets go where the goal is. With a `guide` (`tasks/README.md`) the last millimetres
+  go in moves from where the scene sees the part, centred and turned onto the goal and pressed a
+  little further, searching round the axis on a spiral where a move gains no depth.
+- `screw`: turns the part `task.screw_step_deg` a move from where the scene sees it, pressed
+  `task.screw_preload_m` below the height its thread gives it, so the thread sets how far it goes
+  down, until it is within `task.screw_seated_m` of its seat. When `joint6` comes within
+  `task.wrist_margin_rad` of its limit the fingers let go, the wrist turns back half a turn and
+  the fingers close on the part's flats again at the grasp's height on it. A thread that has not
+  taken the part after its turns and `task.screw_search_turns` more fails the stage.
+- `twist`: turns the part in place by the stage's twist, in moves of at most
+  `task.max_turn_step_deg`.
 
 The fingers then open, the arm rises and the part's pose in the scene is checked against its
 goal (`task.goal_tolerance_m`, `task.goal_tolerance_deg`). The fingers may touch the part, and the

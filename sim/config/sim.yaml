@@ -64,8 +64,9 @@ world:
     - {name: green_cube, colour: [0.1, 0.65, 0.2], size_m: 0.05, xy_m: [0.30, 0.10], mass_kg: 0.05}
     - {name: blue_cube, colour: [0.1, 0.25, 0.8], size_m: 0.05, xy_m: [0.34, 0.0], mass_kg: 0.05}
     - {name: yellow_cube, colour: [0.9, 0.8, 0.1], size_m: 0.05, xy_m: [0.24, 0.0], mass_kg: 0.05}
-  # Simulation time between two ground truth messages (sim/objects), seconds.
-  ground_truth_period_s: 0.5
+  # Simulation time between two ground truth messages (sim/objects), seconds: a screw follows its
+  # part's height from them (piper_skills).
+  ground_truth_period_s: 0.1
 
 camera:
   enabled: true

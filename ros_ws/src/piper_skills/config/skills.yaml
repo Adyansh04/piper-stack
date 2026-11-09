@@ -181,12 +181,26 @@
       # sim's 2000 N/m finger drives is a 6 N squeeze, under their 10 N limit, so both fingers keep
       # pushing and hold the part centred (saturated, the pair drifts sideways with the part).
       squeeze_m: 0.003
-      # The largest turn of one straight move: Pilz turns the shorter way, so under half a turn.
+      # The largest turn of one straight move of a twist: Pilz turns the shorter way, so under half
+      # a turn.
       max_turn_step_deg: 90.0
       # The joint that turns the TCP about its z; a screw lets go and turns it back half a turn
       # this far from its limits, radians.
       wrist_joint: "joint6"
       wrist_margin_rad: 0.15
+      # How long MoveIt's scene takes to show a part where it was last measured, seconds: the
+      # simulator's ground truth comes every 0.1 s, task_scene catches up every 0.1 s. A lifted
+      # part is looked at once this way, so it, not the grasp, is put on its mate.
+      scene_settle_s: 0.3
+      # A screw turns its part this far a move, from where the scene sees it, pressed this far
+      # below the height its thread gives it, metres: the thread, not the arm, sets the descent,
+      # and an unengaged thread is pressed onto until its start comes round (within a turn in
+      # Newton). It is seated this near its seat, metres, and the thread's start may take this
+      # many turns beyond the thread's own.
+      screw_step_deg: 45.0
+      screw_preload_m: 0.0005
+      screw_seated_m: 0.0005
+      screw_search_turns: 1.5
       # A released part settles this long before its pose is checked, seconds, and may end this
       # far from its goal: metres, and degrees of tilt or of turn (the collar's thread play turns
       # it up to about 17 degrees about where it seats).

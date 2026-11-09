@@ -5,7 +5,7 @@
     # file's task_file argument.
     task_file: ""
     # The parts' poses (tf2_msgs/TFMessage, child frame = the part's name): Isaac Sim's ground
-    # truth, every 0.5 s of simulation time.
+    # truth, every 0.1 s of simulation time.
     poses_topic: "/sim/objects"
     # MoveIt's planning frame; poses in any other frame are ignored.
     planning_frame: "world"
@@ -13,8 +13,9 @@
     # gripper.touch_links).
     tcp_link: "tcp"
     touch_links: [gripper_base, link6, link7, link8]
-    # A part is moved in the scene once its pose changed by more than 1 mm or 0.01 rad.
-    position_tolerance_m: 0.001
-    angle_tolerance_rad: 0.01
+    # A part is moved in the scene once its pose changed by more than 0.2 mm or 0.005 rad: a
+    # screw follows its part's height and turn from the scene (skills.yaml's task.screw_*).
+    position_tolerance_m: 0.0002
+    angle_tolerance_rad: 0.005
     # How often the scene catches up with the poses, seconds.
-    update_period_s: 0.5
+    update_period_s: 0.1

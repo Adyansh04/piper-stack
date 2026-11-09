@@ -2,6 +2,8 @@
 
 #include <yaml-cpp/yaml.h>
 
+#include <algorithm>
+#include <cmath>
 #include <cstddef>
 #include <format>
 #include <numbers>
@@ -140,6 +142,21 @@ Stage parseStage(const YAML::Node & node, const YAML::Node & scene, const std::s
             throw std::invalid_argument(std::format("{}.twist_deg must not be 0", where));
         }
     }
+    if (const auto guide = node["guide"])
+    {
+        if (stage.motion != StageMotion::kInsert)
+        {
+            throw std::invalid_argument(std::format("{}.guide is for an insert", where));
+        }
+        const auto at = where + ".guide";
+        stage.guide = InsertGuide{
+            .from_m = positive(guide, "from_m", at),
+            .step_m = positive(guide, "step_m", at),
+            .push_m = positive(guide, "push_m", at),
+            .spiral_m = positive(guide, "spiral_m", at),
+            .tries = static_cast<int>(positive(guide, "tries", at)),
+        };
+    }
     if (const auto tolerance = node["goal_tolerance"])
     {
         stage.goal_tolerance_m = positive(tolerance, "position_m", where + ".goal_tolerance");
@@ -219,6 +236,30 @@ Eigen::Isometry3d partOnMate(const Stage & stage, double left)
         (stage.release_m * stage.approach_axis) + Eigen::Vector3d(0.0, 0.0, left * lift_m));
     out.rotate(Eigen::AngleAxisd(-left * stageTurn(stage), Eigen::Vector3d::UnitZ()));
     return out;
+}
+
+Eigen::Isometry3d screwStep(
+    const Stage & stage, const Eigen::Isometry3d & on_seat, double step_rad, double preload_m)
+{
+    const double drop_m = stage.pitch_m * step_rad / (2.0 * std::numbers::pi);
+    Eigen::Isometry3d out = Eigen::Isometry3d::Identity();
+    out.translate(
+        Eigen::Vector3d(0.0, 0.0, std::max(0.0, on_seat.translation().z() - drop_m) - preload_m));
+    out.rotate(on_seat.rotation());
+    out.rotate(
+        Eigen::AngleAxisd(std::copysign(step_rad, stageTurn(stage)), Eigen::Vector3d::UnitZ()));
+    return out;
+}
+
+Eigen::Vector3d searchOffset(const Stage & stage, const InsertGuide & guide, int attempt)
+{
+    // The golden angle spreads the points of a spiral evenly round it.
+    constexpr double kGoldenAngleRad = 2.399963229728653;
+    const Eigen::Vector3d across_u = stage.approach_axis.unitOrthogonal();
+    const Eigen::Vector3d across_v = stage.approach_axis.cross(across_u);
+    const double angle_rad = attempt * kGoldenAngleRad;
+    const double radius_m = guide.spiral_m * std::sqrt(static_cast<double>(attempt) / guide.tries);
+    return radius_m * ((std::cos(angle_rad) * across_u) + (std::sin(angle_rad) * across_v));
 }
 
 std::vector<Eigen::Isometry3d> stageGrasps(const Stage & stage)
