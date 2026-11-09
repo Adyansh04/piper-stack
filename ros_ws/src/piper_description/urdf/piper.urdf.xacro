@@ -4,8 +4,9 @@
      enable_on_activate (true|false), speed_percent, wrist_camera (true|false),
      motion_mode (joint|cpv|mit), collision_level (-1|0-8), end_load (|empty|half|full),
      overhead_camera (true|false) with its optical frame's overhead_camera_xyz (m) and
-     overhead_camera_rpy (rad) in world: 1 m above the work area, looking down, the image's top
-     away from the arm. -->
+     overhead_camera_rpy (rad) in world: 0.45 m up, in front of the work area and to the arm's
+     right, looking at its middle (0.27, 0.02, 0.03) 41 degrees down, so the arm above the parts
+     does not hide them and the arm and the boards are both in view. -->
 <robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="piper">
   <xacro:arg name="prefix" default=""/>
   <xacro:arg name="hardware" default="mock"/>
@@ -17,8 +18,8 @@
   <xacro:arg name="collision_level" default="-1"/>
   <xacro:arg name="end_load" default=""/>
   <xacro:arg name="overhead_camera" default="true"/>
-  <xacro:arg name="overhead_camera_xyz" default="0.3 0 1.0"/>
-  <xacro:arg name="overhead_camera_rpy" default="${pi} 0 ${-pi / 2}"/>
+  <xacro:arg name="overhead_camera_xyz" default="0.62 -0.32 0.45"/>
+  <xacro:arg name="overhead_camera_rpy" default="-2.2815 0 0.7999"/>
 
   <xacro:include filename="$(find piper_description)/urdf/piper_arm.xacro"/>
   <xacro:include filename="$(find piper_description)/urdf/piper.ros2_control.xacro"/>

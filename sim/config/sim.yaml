@@ -120,9 +120,10 @@ newton:
   # stiff pads (1e7 N/m) jammed it 4 mm above its seat (9 Nov). To fit to the real pads.
   finger_material: null
 
-# The overhead RGB camera: a standard USB camera on a stand above the work area. Its optical frame
-# is in the robot description (piper.urdf.xacro's overhead_camera args: 1 m above the table,
-# looking straight down); it publishes as a USB camera driver does, colour only.
+# The overhead RGB camera: a standard USB camera on a stand by the work area. Its optical frame is
+# in the robot description (piper.urdf.xacro's overhead_camera args: 0.45 m up, in front of the
+# work area and to the arm's right, looking at it 41 degrees down, so the arm does not hide the
+# parts); it publishes as a USB camera driver does, colour only.
 overhead_camera:
   enabled: true
   frame: overhead_camera_color_optical_frame

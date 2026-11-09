@@ -22,7 +22,7 @@ xacro "$(ros2 pkg prefix piper_description)/share/piper_description/urdf/piper.u
 | `motion_mode` | `joint` | `joint`, `cpv` or `mit` (MIT adds velocity and effort command interfaces) |
 | `collision_level`, `end_load` | `-1`, empty | Set at activation; the defaults keep the firmware's |
 | `wrist_camera` | `true` | The camera mount and the camera's frames |
-| `overhead_camera` | `true` | The overhead camera's optical frame in `world`, at `overhead_camera_xyz` (m) and `overhead_camera_rpy` (rad): 1 m above the work area, looking down |
+| `overhead_camera` | `true` | The overhead camera's optical frame in `world`, at `overhead_camera_xyz` (m) and `overhead_camera_rpy` (rad): 0.45 m up, in front of the work area and to the arm's right, looking at its middle 41 degrees down |
 | `prefix` | empty | Prefix of every link and joint name |
 
 ## Frames

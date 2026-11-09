@@ -61,8 +61,9 @@ cameras, Newton's solver settings and the joint drives, with a comment on each v
 - `/wrist_camera/color/image_raw`, `/wrist_camera/depth/image_raw` (32FC1 metres, aligned to colour)
   and their `camera_info`, as Percipio's driver names them.
 - `/overhead_camera/color/image_raw` and its `camera_info` (1280 x 720, 70 degree field of view),
-  as a USB camera driver names them: the overhead RGB camera, 1 m above the table looking down, in
-  `overhead_camera_color_optical_frame` (the robot description holds its pose).
+  as a USB camera driver names them: the overhead RGB camera, 0.45 m up in front of the work area
+  and to the arm's right, looking at it 41 degrees down, in `overhead_camera_color_optical_frame`
+  (the robot description holds its pose).
 - `/sim/objects`: the cubes' or the task parts' poses in `world` (TFMessage, the child frame is the
-  object's name), every 0.5 s of simulation time, static parts (a task's fixture) included: the
+  object's name), every 0.1 s of simulation time, static parts (a task's fixture) included: the
   ground truth for tests, scripted experts and MoveIt's planning scene.
