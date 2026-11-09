@@ -103,8 +103,8 @@ struct StageSettings
  * down its thread in straight moves of at most `max_turn_step_rad`, letting go and turning the
  * wrist back half a turn whenever the wrist nears its limit; a twist turns it in place. The
  * fingers let go, the arm rises and the part's pose is checked against its goal. The fingers may
- * touch the part, and the stage's contacts are allowed, only while the stage runs; the part may
- * touch what it rests on until it is lifted.
+ * touch the part, and the stage's contacts are allowed, only while the stage runs; the part and
+ * the fingers may touch what the part rests on until it is lifted.
  *
  * @note Every call blocks until done and must come from a thread that no executor of the node
  * runs on; the services' answers come on the callback group given at construction.

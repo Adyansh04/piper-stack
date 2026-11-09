@@ -179,11 +179,16 @@ std::expected<double, std::string> StageRunner::run(
     {
         touching.emplace_back(link, stage.part);
     }
-    // Held, the part still touches what it rests on until it is lifted off it.
+    // Held, the part still touches what it rests on until it is lifted off it, and so may the
+    // fingers round it (a cradle or a pocket's rim).
     Pairs resting;
     if (!stage.support.empty())
     {
         resting.emplace_back(stage.part, stage.support);
+        for (const auto & link : settings_.touch_links)
+        {
+            resting.emplace_back(link, stage.support);
+        }
     }
     touching.insert(touching.end(), resting.begin(), resting.end());
     const auto grasp =
