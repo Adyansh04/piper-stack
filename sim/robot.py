@@ -174,14 +174,25 @@ def set_sdf_collision(stage, root: str, newton: dict) -> int:
         stage: The stage, the robot loaded.
         root: The robot's prim.
         newton: sim.yaml's newton section: ``sdf_links``, ``sdf_resolution`` (cells along a mesh's
-            longest side), ``sdf_band_m`` and ``contact_gap_m`` (metres).
+            longest side), ``sdf_band_m`` and ``contact_gap_m`` (metres), ``finger_material``.
 
     Returns:
         The number of meshes changed.
     """
-    from pxr import PhysxSchema, Sdf, Usd, UsdPhysics
+    from pxr import PhysxSchema, Sdf, Usd, UsdPhysics, UsdShade
 
     links = set(newton['sdf_links'])
+    pads = newton['finger_material']
+    material = UsdShade.Material.Define(stage, Sdf.Path(f'{root}/Looks/finger_pads'))
+    api = UsdPhysics.MaterialAPI.Apply(material.GetPrim())
+    api.CreateStaticFrictionAttr(float(pads['static_friction']))
+    api.CreateDynamicFrictionAttr(float(pads['dynamic_friction']))
+    material.GetPrim().AddAppliedSchema('NewtonMaterialAPI')
+    for name in ('contact_stiffness', 'contact_damping'):
+        key = 'contactStiffness' if name == 'contact_stiffness' else 'contactDamping'
+        material.GetPrim().CreateAttribute(
+            f'newton:{key}', Sdf.ValueTypeNames.Float, custom=False
+        ).Set(float(pads[name]))
     # A link's collision instance shares the link's name (its look is <link>_gray).
     instances = [
         prim
@@ -209,6 +220,9 @@ def set_sdf_collision(stage, root: str, newton: dict) -> int:
                 ('contactGap', real, float(newton['contact_gap_m'])),
             ):
                 prim.CreateAttribute(f'newton:{name}', type_name, custom=False).Set(value)
+            UsdShade.MaterialBindingAPI.Apply(prim).Bind(
+                material, UsdShade.Tokens.weakerThanDescendants, 'physics'
+            )
             count += 1
     return count
 

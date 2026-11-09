@@ -10,6 +10,7 @@ publishes its own beside them. Its cost per step is in the status line.
 
 from __future__ import annotations
 
+import dataclasses
 import math
 import threading
 import time
@@ -359,6 +360,13 @@ def run(app, cfg: dict, stop: threading.Event) -> None:
                     f'Task {task} placed with seed {seed}: moved {1e3 * move[0, 3]:+.1f} '
                     f'{1e3 * move[1, 3]:+.1f} mm and {yaw:+.1f} degrees'
                 )
+            if (
+                spec.cable is not None
+                and cfg['app']['engine'] == 'newton'
+                and not cfg['newton']['cable']
+            ):
+                log.warning(f'Task {task} without its cable: Newton needs it as an articulation')
+                spec = dataclasses.replace(spec, cable=None)
             fixed = spec.fixed
             files = task_usd.build(spec, Path(r['usd_cache']).parent / 'tasks')
             bodies = task_usd.body_paths(spec, task_usd.add(stage, spec, files))
